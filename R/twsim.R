@@ -401,9 +401,10 @@ twsim <- function(iterations=1000, cores=NULL, ...){
 # From Empirical Examples -------------------------------------------------
 
 # used to iterate over V-DEM posterior samples
-over_posterior <- function(x,y) {
+over_posterior <- function(x=NULL,y=NULL,modelfunc=NULL,merged_data=NULL,select_vars=NULL,...) {
+  to_analyze <- merged_data[,c(x,select_vars)]
   to_analyze$v2x_polyarchy <- merged_data[[x]]
-  model1 <- lm(formula = y,data = to_analyze)
+  model1 <- modelfunc(formula = y,data = to_analyze,...)
   # Use the sandwich estimator to adjust variances
   # Need to drop coefs that come out as NA
   # This happens with the country of the Republic of Vietnam in the within-between model (model 5)
@@ -415,4 +416,13 @@ over_posterior <- function(x,y) {
   samples <- MASS::mvrnorm(mu=coefs,Sigma=sds)
   return(samples)
 }
+
+#' @export
+run_vdem <- function(merged_data=NULL,varnames=NULL,full_formula=NULL,modelfunc=lm(),select_vars=NULL,...) {
+  model1 <- sapply(varnames,over_posterior,full_formula,modelfunc,all_data,select_vars,...)
+  results <- tibble::data_frame(betas=row.names(model1),coef=apply(model1,1,mean),
+             sd=apply(model1,1,sd),upper=coef + 1.96*sd,lower=coef - 1.96*sd)
+  return(results)
+}
+
 
