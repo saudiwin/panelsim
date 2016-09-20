@@ -397,3 +397,22 @@ twsim <- function(iterations=1000, cores=NULL, ...){
   }, mc.cores=cores, SIMPLIFY=TRUE)
 }
 
+
+# From Empirical Examples -------------------------------------------------
+
+# used to iterate over V-DEM posterior samples
+over_posterior <- function(x,y) {
+  to_analyze$v2x_polyarchy <- merged_data[[x]]
+  model1 <- lm(formula = y,data = to_analyze)
+  # Use the sandwich estimator to adjust variances
+  # Need to drop coefs that come out as NA
+  # This happens with the country of the Republic of Vietnam in the within-between model (model 5)
+  # The sandwich estimator will automatically drop NA coefficients from the VCOV matrix, causing an error
+  # With MASS
+  coefs <- coef(model1)[!is.na(coef(model1))]
+  sds <- vcovHC(model1,type='HC0')
+
+  samples <- MASS::mvrnorm(mu=coefs,Sigma=sds)
+  return(samples)
+}
+
