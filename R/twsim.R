@@ -411,17 +411,27 @@ over_posterior <- function(x=NULL,y=NULL,modelfunc=NULL,merged_data=NULL,select_
   # The sandwich estimator will automatically drop NA coefficients from the VCOV matrix, causing an error
   # With MASS
   coefs <- coef(model1)[!is.na(coef(model1))]
-  sds <- vcovHC(model1,type='HC0')
+  sds <- sandwich::vcovHC(model1,type='HC0')
 
   samples <- MASS::mvrnorm(mu=coefs,Sigma=sds)
   return(samples)
 }
 
 #' @export
-run_vdem <- function(merged_data=NULL,varnames=NULL,full_formula=NULL,modelfunc=lm(),select_vars=NULL,...) {
-  model1 <- sapply(varnames,over_posterior,full_formula,modelfunc,all_data,select_vars,...)
-  results <- tibble::data_frame(betas=row.names(model1),coef=apply(model1,1,mean),
-             sd=apply(model1,1,sd),upper=coef + 1.96*sd,lower=coef - 1.96*sd)
+run_vdem <- function(merged_data=NULL,varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NULL,num_cores=1,
+                     num_iters=NULL,...) {
+# if rest than the full subset of the posterior samples are used, use a specific number of samples
+    if(is.null(num_iters)) {
+    num_iters <- 1:length(varnames)
+  } else {
+    num_iters <- sample(1:length(varnames),num_iters)
+  }
+  varnames <- varnames[num_iters]
+
+  model1 <- parallel::mclapply(varnames,over_posterior,y=full_formula,modelfunc=modelfunc,merged_data=merged_data,select_vars=select_vars,...,mc.cores=num_cores)
+  model1 <- matrix(unlist(model1),nrow=length(varnames),dimnames=list(varnames,c("Intercept",select_vars)),byrow = TRUE)
+  results <- tibble::data_frame(betas=colnames(model1),coef=apply(model1,2,mean),
+             sd=apply(model1,2,sd),upper=coef + 1.96*sd,lower=coef - 1.96*sd)
   return(results)
 }
 
