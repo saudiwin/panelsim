@@ -443,8 +443,8 @@ panel_balance <- function(merged_data=NULL,select_vars=NULL) {
   }
   select_vars <- select_vars[!duplicated(select_vars)]
   merged_data <- merged_data[,c('v2x_polyarchy',select_vars)]
- countries <-  ggplot(data=merged_data,aes(reorder(country_name,country_name,function(x)-length(x)))) + geom_bar() + ylab("") + xlab("")
- years <-  ggplot(data=merged_data,aes(reorder(year_factor,year_factor,function(x)-length(x)))) + geom_bar() + ylab("") + xlab("")
+ countries <-  ggplot(data=merged_data,aes(reorder(country_name,country_name,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
+ years <-  ggplot(data=merged_data,aes(reorder(year_factor,year_factor,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
  return(list(countries=countries,years=years))
 }
 
