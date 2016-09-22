@@ -429,7 +429,8 @@ run_vdem <- function(merged_data=NULL,varnames=NULL,full_formula=NULL,modelfunc=
   varnames <- varnames[num_iters]
 
   model1 <- parallel::mclapply(varnames,over_posterior,y=full_formula,modelfunc=modelfunc,merged_data=merged_data,select_vars=select_vars,...,mc.cores=num_cores)
-  model1 <- matrix(unlist(model1),nrow=length(varnames),dimnames=list(varnames,c("Intercept",select_vars)),byrow = TRUE)
+  beta_names <- names(model1[[1]])
+  model1 <- matrix(unlist(model1),nrow=length(varnames),dimnames=list(varnames,beta_names),byrow = TRUE)
   results <- tibble::data_frame(betas=colnames(model1),coef=apply(model1,2,mean),
              sd=apply(model1,2,sd),upper=coef + 1.96*sd,lower=coef - 1.96*sd)
   return(results)
