@@ -433,7 +433,7 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
   }
   varnames <- varnames[num_iters]
   varnames <- paste0(varnames,c('country_text_id','year'),collapse=",")
-  pos_data <- dbGetQuery(dbcon,paste0("SELECT ",varnames," FROM vdem_pos"))
+  pos_data <- RSQLite::dbGetQuery(dbcon,paste0("SELECT ",varnames," FROM vdem_pos"))
   # merge together for analysis
   merged_data <- dplyr::left_join(vdem_data,vdem_pos,by=c('country_text_id','year'))
   model1 <- parallel::mclapply(names(pos_data),over_posterior,y=full_formula,modelfunc=modelfunc,merged_data=merged_data,...,mc.cores=num_cores)
@@ -450,7 +450,7 @@ panel_balance <- function(dbcon=NULL,select_vars=NULL) {
     select_vars <- c(select_vars,'year_factor','country_name')
   }
   select_vars <- select_vars[!duplicated(select_vars)]
-  merged_data <- dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data'))
+  merged_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data'))
  countries <-  ggplot(data=merged_data,aes(reorder(country_name,country_name,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
  years <-  ggplot(data=merged_data,aes(reorder(year_factor,year_factor,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
  return(list(countries=countries,years=years))

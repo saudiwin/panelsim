@@ -1,12 +1,12 @@
 Package: twowaysim
 Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1
-Date: 2016-09-20
-Author: Who wrote it
-Maintainer: Who to complain to <yourfault@somewhere.net>
+Title: R Shiny Simulation of Two-Way and One-Way Fixed Effects
+Version: 0.2
+Date: 2016-10-03
+Author: Robert Kubinec and Jonathan Kropko
+Maintainer: Robert Kubinec <rmk7xy@virginia.edu>
 Description: More about what it does (maybe more than one line)
-Imports: dplyr,plm,MASS,sandwich
+Imports: dplyr,plm,MASS,sandwich,RSQLite
 License: What license is it under?
 LazyData: FALSE
 RoxygenNote: 5.0.1
