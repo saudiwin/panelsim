@@ -445,12 +445,12 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
 }
 
 #' @export
-panel_balance <- function(merged_data=NULL,select_vars=NULL) {
+panel_balance <- function(dbcon=NULL,select_vars=NULL) {
   if(!(("year_factor" %in% select_vars) && ("country_name"%in% select_vars))) {
     select_vars <- c(select_vars,'year_factor','country_name')
   }
   select_vars <- select_vars[!duplicated(select_vars)]
-  merged_data <- merged_data[,c('v2x_polyarchy',select_vars)]
+  merged_data <- dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data'))
  countries <-  ggplot(data=merged_data,aes(reorder(country_name,country_name,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
  years <-  ggplot(data=merged_data,aes(reorder(year_factor,year_factor,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
  return(list(countries=countries,years=years))
