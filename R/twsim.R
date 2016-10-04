@@ -422,7 +422,7 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
                      num_iters=NULL,dbcon=NULL,...) {
 
   # Load analysis variables from SQLITE database
-
+  dbcon <- RSQLite::dbConnect(RSQLite::SQLite(), dbcon)
   merged_data <- dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,'country_text_id','year',collapse=','),' FROM vdem_data'))
 
 # if rest than the full subset of the posterior samples are used, use a specific number of samples
@@ -441,11 +441,17 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
   model1 <- matrix(unlist(model1),nrow=length(varnames),dimnames=list(varnames,beta_names),byrow = TRUE)
   results <- tibble::data_frame(betas=colnames(model1),coef=apply(model1,2,mean),
              sd=apply(model1,2,sd),upper=coef + 1.96*sd,lower=coef - 1.96*sd)
+
+
+  RSQLite::dbDisconnect(dbcon)
+
   return(results)
 }
 
+#' @import ggplot2
 #' @export
 panel_balance <- function(dbcon=NULL,select_vars=NULL) {
+  dbcon <- RSQLite::dbConnect(RSQLite::SQLite(), dbcon)
   if(!(("year_factor" %in% select_vars) && ("country_name"%in% select_vars))) {
     select_vars <- c(select_vars,'year_factor','country_name')
   }
@@ -453,6 +459,9 @@ panel_balance <- function(dbcon=NULL,select_vars=NULL) {
   merged_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data'))
  countries <-  ggplot(data=merged_data,aes(reorder(country_name,country_name,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
  years <-  ggplot(data=merged_data,aes(reorder(year_factor,year_factor,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
+
+ RSQLite::dbDisconnect(dbcon)
+
  return(list(countries=countries,years=years))
 }
 
