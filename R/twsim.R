@@ -403,7 +403,9 @@ twsim <- function(iterations=1000, cores=NULL, ...){
 # used to iterate over V-DEM posterior samples
 over_posterior <- function(x=NULL,y=NULL,modelfunc=NULL,merged_data=NULL,select_vars=NULL,...) {
   to_analyze <- merged_data[,c(x,select_vars)]
-  to_analyze$v2x_polyarchy <- merged_data[[x]]
+  names(to_analyze) <- c('v2x_polyarchy',select_vars)
+  # Need to avoid an evaluation error by resetting modelfunc to current namespace
+  modelfunc <- force(modelfunc)
   model1 <- modelfunc(formula = y,data = to_analyze,...)
   # Use the sandwich estimator to adjust variances
   # Need to drop coefs that come out as NA
@@ -419,11 +421,12 @@ over_posterior <- function(x=NULL,y=NULL,modelfunc=NULL,merged_data=NULL,select_
 
 #' @export
 run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NULL,num_cores=1,
-                     num_iters=NULL,dbcon=NULL,...) {
+                     num_iters=900,dbcon=NULL,...) {
 
   # Load analysis variables from SQLITE database
   dbcon <- RSQLite::dbConnect(RSQLite::SQLite(), dbcon)
-  merged_data <- dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,'country_text_id','year',collapse=','),' FROM vdem_data'))
+  select_vars <- c(select_vars,'country_text_id','year')
+  vdem_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data'))
 
 # if rest than the full subset of the posterior samples are used, use a specific number of samples
     if(is.null(num_iters)) {
@@ -431,14 +434,14 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
   } else {
     num_iters <- sample(1:length(varnames),num_iters)
   }
-  varnames <- varnames[num_iters]
-  varnames <- paste0(varnames,c('country_text_id','year'),collapse=",")
-  pos_data <- RSQLite::dbGetQuery(dbcon,paste0("SELECT ",varnames," FROM vdem_pos"))
+  var_collapse <- c(varnames[num_iters],'country_text_id','year')
+  var_collapse <- paste0(var_collapse,collapse=",")
+  vdem_pos <- RSQLite::dbGetQuery(dbcon,paste0("SELECT ",var_collapse," FROM vdem_pos"))
   # merge together for analysis
   merged_data <- dplyr::left_join(vdem_data,vdem_pos,by=c('country_text_id','year'))
-  model1 <- parallel::mclapply(names(pos_data),over_posterior,y=full_formula,modelfunc=modelfunc,merged_data=merged_data,...,mc.cores=num_cores)
+  model1 <- parallel::mclapply(varnames[num_iters],over_posterior,y=full_formula,select_vars=select_vars,modelfunc=modelfunc,merged_data=merged_data,...,mc.cores=num_cores)
   beta_names <- names(model1[[1]])
-  model1 <- matrix(unlist(model1),nrow=length(varnames),dimnames=list(varnames,beta_names),byrow = TRUE)
+  model1 <- matrix(unlist(model1),nrow=length(num_iters),dimnames=list(num_iters,beta_names),byrow = TRUE)
   results <- tibble::data_frame(betas=colnames(model1),coef=apply(model1,2,mean),
              sd=apply(model1,2,sd),upper=coef + 1.96*sd,lower=coef - 1.96*sd)
 
@@ -451,11 +454,18 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
 #' @import ggplot2
 #' @export
 panel_balance <- function(dbcon=NULL,select_vars=NULL) {
-  dbcon <- RSQLite::dbConnect(RSQLite::SQLite(), dbcon)
+#   sink(file = "rsqlite.txt",append=FALSE)
+   dbcon <- RSQLite::dbConnect(RSQLite::SQLite(), dbcon)
+#   dbExistsTable(dbcon,'vdem_data')
+#   dbGetInfo(dbcon)
+#   RSQLite::dbIsValid(dbcon)
+#   dbListTables(dbconn)
   if(!(("year_factor" %in% select_vars) && ("country_name"%in% select_vars))) {
     select_vars <- c(select_vars,'year_factor','country_name')
   }
   select_vars <- select_vars[!duplicated(select_vars)]
+#   print(paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data',' ',dbcon))
+#   sink()
   merged_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data'))
  countries <-  ggplot(data=merged_data,aes(reorder(country_name,country_name,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
  years <-  ggplot(data=merged_data,aes(reorder(year_factor,year_factor,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
