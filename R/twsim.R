@@ -418,8 +418,13 @@ over_posterior <- function(x=NULL,y=NULL,modelfunc=NULL,merged_data=NULL,select_
 }
 
 #' @export
-run_vdem <- function(merged_data=NULL,varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NULL,num_cores=1,
-                     num_iters=NULL,...) {
+run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NULL,num_cores=1,
+                     num_iters=NULL,dbcon=NULL,...) {
+
+  # Load analysis variables from SQLITE database
+
+  merged_data <- dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,'country_text_id','year',collapse=','),' FROM vdem_data'))
+
 # if rest than the full subset of the posterior samples are used, use a specific number of samples
     if(is.null(num_iters)) {
     num_iters <- 1:length(varnames)
@@ -427,8 +432,11 @@ run_vdem <- function(merged_data=NULL,varnames=NULL,full_formula=NULL,modelfunc=
     num_iters <- sample(1:length(varnames),num_iters)
   }
   varnames <- varnames[num_iters]
-
-  model1 <- parallel::mclapply(varnames,over_posterior,y=full_formula,modelfunc=modelfunc,merged_data=merged_data,select_vars=select_vars,...,mc.cores=num_cores)
+  varnames <- paste0(varnames,c('country_text_id','year'),collapse=",")
+  pos_data <- dbGetQuery(dbcon,paste0("SELECT ",varnames," FROM vdem_pos"))
+  # merge together for analysis
+  merged_data <- dplyr::left_join(vdem_data,vdem_pos,by=c('country_text_id','year'))
+  model1 <- parallel::mclapply(names(pos_data),over_posterior,y=full_formula,modelfunc=modelfunc,merged_data=merged_data,...,mc.cores=num_cores)
   beta_names <- names(model1[[1]])
   model1 <- matrix(unlist(model1),nrow=length(varnames),dimnames=list(varnames,beta_names),byrow = TRUE)
   results <- tibble::data_frame(betas=colnames(model1),coef=apply(model1,2,mean),
