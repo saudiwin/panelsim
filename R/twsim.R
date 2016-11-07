@@ -426,10 +426,11 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
   # Load analysis variables from SQLITE database
   dbcon <- RSQLite::dbConnect(RSQLite::SQLite(), dbcon)
   select_vars <- c(select_vars,'country_text_id','year')
-  vdem_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data'))
+  vdem_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data')) %>%
+    as_tibble %>% mutate(year_factor=factor(year))
 
 # if rest than the full subset of the posterior samples are used, use a specific number of samples
-    if(is.null(num_iters)) {
+    if(is.null(num_iters) || num_iters==900) {
     num_iters <- 1:length(varnames)
   } else {
     num_iters <- sample(1:length(varnames),num_iters)
@@ -452,27 +453,46 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
 }
 
 #' @import ggplot2
+#' @import plotly
 #' @export
-panel_balance <- function(dbcon=NULL,select_vars=NULL) {
-#   sink(file = "rsqlite.txt",append=FALSE)
+panel_balance <- function(dbcon=NULL,select_vars=NULL,use_plotly=TRUE) {
+
    dbcon <- RSQLite::dbConnect(RSQLite::SQLite(), dbcon)
-#   dbExistsTable(dbcon,'vdem_data')
-#   dbGetInfo(dbcon)
-#   RSQLite::dbIsValid(dbcon)
-#   dbListTables(dbconn)
+
   if(!(("year_factor" %in% select_vars) && ("country_name"%in% select_vars))) {
     select_vars <- c(select_vars,'year_factor','country_name')
   }
   select_vars <- select_vars[!duplicated(select_vars)]
-#   print(paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data',' ',dbcon))
-#   sink()
-  merged_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data'))
- countries <-  ggplot(data=merged_data,aes(reorder(country_name,country_name,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
- years <-  ggplot(data=merged_data,aes(reorder(year_factor,year_factor,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
+
+  merged_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data')) %>% as.tbl
+  if(use_plotly==TRUE) {
+    countries <- plot_ly(merged_data,x=~country_name) %>% add_histogram()
+    years <-  plot_ly(merged_data,x=~year_factor) %>% add_histogram()
+  } else {
+    countries <- ggplot(data=merged_data,aes(reorder(country_name,country_name,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
+    years <- ggplot(data=merged_data,aes(reorder(year_factor,year_factor,function(x)-length(x)))) + geom_bar(alpha=0.5) + ylab("") + xlab("")
+  }
+
 
  RSQLite::dbDisconnect(dbcon)
 
  return(list(countries=countries,years=years))
 }
 
+
+# Helper Functions --------------------------------------------------------
+
+
+#' @export
+to_round <- function(colvar,sigdif) {
+  outputvar <- format(round(colvar,digits=sigdif),nsmall=sigdif)
+  return(outputvar)
+}
+
+#' @export
+prepare_for_display <- function(x) {
+  x <- filter(x, betas %in% control_vars) %>% mutate_if(is.numeric,to_round,sigdif=3) %>% mutate(TCI=paste0("(",lower,",",upper,")"))
+  x <-  x %>%  select(betas,coef,TCI) %>% gather(value_type,to_display,-betas) %>% unite(row_value,betas,value_type)
+  return(x)
+}
 
