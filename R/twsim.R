@@ -419,9 +419,23 @@ over_posterior <- function(x=NULL,y=NULL,modelfunc=NULL,merged_data=NULL,select_
   return(samples)
 }
 
+#' VDEM download function
+#' @export
+download_vdem <- function() {
+  download.file('https://drive.google.com/file/d/0B9aB0fj0poVqd2QyRFVqbWFkaHM/view?usp=sharing',
+                destfile='data/vdem_data.sqlite')
+}
+
+
 #' @export
 run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NULL,num_cores=1,
                      num_iters=900,dbcon=NULL,...) {
+
+  #If SQLite database does not exist, then make user run download function
+  if(!file.exists('data/vdem_data.sqlite')) {
+      stop('You must first run the download_vdem() function before running VDEM models to download the vdem data.')
+  }
+
 
   # Load analysis variables from SQLITE database
   dbcon <- RSQLite::dbConnect(RSQLite::SQLite(), dbcon)
