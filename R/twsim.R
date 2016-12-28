@@ -433,7 +433,7 @@ download_vdem <- function() {
 
 #' @export
 run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NULL,num_cores=1,
-                     num_iters=900,dbcon=NULL,...) {
+                     num_iters=900,dbcon=NULL,country_interaction=FALSE,time_interaction=FALSE,...) {
 
   #If SQLite database does not exist, then make user run download function
   if(!file.exists('data/vdem_data.sqlite')) {
@@ -446,6 +446,17 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
   select_vars <- c(select_vars,'country_text_id','year')
   vdem_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data')) %>%
     as_tibble %>% mutate(year_factor=factor(year))
+  
+  if(time_interaction==TRUE) {
+    vdem_data$europe <- if_else(vdem_data$e_regionpol==5,1,0)
+    select_vars <- c(select_vars,'europe')
+  } else if(country_interaction==TRUE) {
+    vdem_data$time_period <- vdem_data$year
+    vdem_data$time_period[vdem_data$year<1918] <- 0
+    vdem_data$time_period[(vdem_data$year>1917 & vdem_data$year<1933) | (vdem_data$year>1990)] <- 1
+    vdem_data$time_period[vdem_data$year>1932 & vdem_data$year<1991] <- -1
+    select_vars <- c(select_vars,'time_period')
+  }
 
 # if rest than the full subset of the posterior samples are used, use a specific number of samples
     if(is.null(num_iters) || num_iters==900) {
@@ -461,13 +472,13 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
   model1 <- parallel::mclapply(varnames[num_iters],over_posterior,y=full_formula,select_vars=select_vars,modelfunc=modelfunc,merged_data=merged_data,...,mc.cores=num_cores)
   beta_names <- names(model1[[1]])
   model1 <- matrix(unlist(model1),nrow=length(num_iters),dimnames=list(num_iters,beta_names),byrow = TRUE)
-  results <- tibble::data_frame(betas=colnames(model1),coef=apply(model1,2,mean),
+  results_condense <- tibble::data_frame(betas=colnames(model1),coef=apply(model1,2,mean),
              sd=apply(model1,2,sd),upper=coef + 1.96*sd,lower=coef - 1.96*sd)
-
+  results_full <- as_data_frame(model1)
 
   RSQLite::dbDisconnect(dbcon)
 
-  return(results)
+  return(list(results_condense=results_condense,results_full=results_full))
 }
 
 #' @import ggplot2
