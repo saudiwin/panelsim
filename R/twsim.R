@@ -422,8 +422,12 @@ over_posterior <- function(x=NULL,y=NULL,modelfunc=NULL,merged_data=NULL,select_
 #' VDEM download function
 #' @export
 download_vdem <- function() {
-  download.file('https://drive.google.com/file/d/0B9aB0fj0poVqd2QyRFVqbWFkaHM/view?usp=sharing',
-                destfile='data/vdem_data.sqlite')
+  if(!dir.exists('data/')) {
+    dir.create('data/')
+  }
+  print("Note, this file is 350MB and will take some time to download.")
+  download.file('https://virginia.box.com/shared/static/20lo0j7pmjpi0i6iyezbo4ewbmdb2zbj.sqlite',
+                destfile='data/vdem_data.sqlite',mode='wb')
 }
 
 
