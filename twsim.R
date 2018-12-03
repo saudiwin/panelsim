@@ -413,7 +413,7 @@ over_posterior <- function(x=NULL,y=NULL,modelfunc=NULL,merged_data=NULL,select_
   # The sandwich estimator will automatically drop NA coefficients from the VCOV matrix, causing an error
   # With MASS
   coefs <- coef(model1)[!is.na(coef(model1))]
-  sds <- sandwich::vcovHC(model1,type='HC0')
+  sds <- multiwayvcov::cluster.vcov(model1,cluster=to_analyze$country_text_id)
 
   samples <- MASS::mvrnorm(mu=coefs,Sigma=sds)
   return(samples)
