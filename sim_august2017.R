@@ -1,7 +1,6 @@
-library(tidyr)
-library(twowaysim)
-#setwd("~/Box Sync/Between Effects/Simulation")
-#source("twsim.R")
+library(tidyverse)
+setwd("~/Box Sync/Between Effects/Simulation")
+source("twsim.R")
 
 set.seed(22902)
 
@@ -25,8 +24,6 @@ sim3 <- gather(sim3, `Two-way FE`:`RE (v_t)`, key="Model", value="Coefficient",
               factor_key=TRUE)
 
 write_csv(sim3, path="sim3.csv")
-
-require(dplyr)
 
 ## Changing N and T, temporal autocorrelation
 iterations <- 500
