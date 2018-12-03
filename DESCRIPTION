@@ -1,12 +1,12 @@
 Package: twowaysim
 Type: Package
-Title: R Shiny Simulation of Two-Way and One-Way Fixed Effects
-Version: 0.2
-Date: 2016-10-03
-Author: Robert Kubinec and Jonathan Kropko
+Title: Simulation of Panel and Hierarchical Datasets with Varying Effects
+Version: 0.3
+Date: 2018-12-03
+Author: Jonathan Kropko and Robert Kubinec 
 Maintainer: Robert Kubinec <rmk7xy@virginia.edu>
-Description: Simulation results for our paper on econometric time series cross section models. Used primarily for an interactive R Shiny application.
+Description: Simulation of panel/hierarchical data that allows for independently generating effects by cross-section and case, including auto-correlation in either dimension.
 Imports: dplyr,plm,MASS,sandwich,RSQLite
-License: What license is it under?
+License: GPL
 LazyData: FALSE
-RoxygenNote: 5.0.1
+RoxygenNote: 6.1.1
