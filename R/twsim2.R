@@ -13,22 +13,22 @@
 # time.ac: correlation between errors in adjacent time points for the same case (default = 0) 
 # spatial.ac: correlation between errors in adjacent cases at the same time (default = 0) 
 #
-# twsimdata() generates the simulated data. Arguments:
+# tw_data() generates the simulated data. Arguments:
 # N: Number of cases (default = 30)
 # T: Number of time points (default = 30)
-# alpha.i.mean: Mean of case-specific intercepts (default = 0)
-# alpha.i.sd: Standard deviation of case-specific intercepts (default = 1)
-# alpha.t.mean: Mean of time-specific intercepts (default = 0)
-# alpha.t.sd: Standard deviation of time-specific intercepts (default = 1)
-# beta.mean: Mean of the (cross-sectional) slopes of the best fit lines within time points (default = 3)
-# beta.sd: SD of the (cross-sectional) slopes of the best fit lines within time points (default = .5)
-# gamma.mean: Mean of the (over-time) slopes of the best fit lines within cases (default = -3)
-# gamma.sd: SD of the (over-time) slopes of the best fit lines within cases (default = .5)
+# case.int.mean: Mean of case-specific intercepts (default = 0)
+# case.int.sd: Standard deviation of case-specific intercepts (default = 1)
+# cross.int.mean: Mean of time-specific intercepts (default = 0)
+# cross.int.sd: Standard deviation of time-specific intercepts (default = 1)
+# cross.eff.mean: Mean of the (cross-sectional) slopes of the best fit lines within time points (default = 3)
+# cross.eff.sd: SD of the (cross-sectional) slopes of the best fit lines within time points (default = .5)
+# case.eff.mean: Mean of the (over-time) slopes of the best fit lines within cases (default = -3)
+# case.eff.sd: SD of the (over-time) slopes of the best fit lines within cases (default = .5)
 # noise.sd: SD of the error applied after generation of y (default = 1)
-# eta1.i: coefficient for how an omitted variable z_i depends on x (default = 0)
-# eta1.t: coefficient for how an omitted variable z_t depends on x (default = 0)
-# eta2.i: coefficient for how an omitted variable z_i depends on y (default = 0)
-# eta2.t: coefficient for how an omitted variable z_t depends on y (default = 0)
+# omm.x.case: coefficient for how an omitted variable z_i depends on x (default = 0)
+# omm.x.cross: coefficient for how an omitted variable z_t depends on x (default = 0)
+# omm.y.case: coefficient for how an omitted variable z_i depends on y (default = 0)
+# omm.y.cross: coefficient for how an omitted variable z_t depends on y (default = 0)
 # binary: whether to make the predictor X binary by cutting at the median (default = FALSE)
 # unbalance: whether to generate unbalanced panels with time frames 1-K, 
 #     where k is drawn from ceiling(runif(min=(T/3), max=T)) (default = FALSE)
@@ -37,25 +37,25 @@
 #
 # twreg() runs regressions within each case and time to compare
 # DGP coefficients to realized coefficients. 
-# Arguments: $data element of output of twsimdata()
+# Arguments: $data element of output of tw_data()
 #
-# twmodel() runs pooled OLS, one-way FEs, RE, and two-way FE models
-# Arguments: output of twsimdata()
+# tw_model() runs pooled OLS, one-way FEs, RE, and two-way FE models
+# Arguments: output of tw_data()
 #
 # twtransform() creates a second version of the simulated data that
 # contains case-level, time-level, and overall means of x and y and 
 # the twoway tranformations. 
-# Arguments: output of twsimdata()
+# Arguments: output of tw_data()
 #
 # twtrans2() multiplies the various transformed variables from twtransform()
 # for the purpose of investigating the formal one-way and two-way FE estimators.
 # Arguments: output of twtransform()
 #
-# twsim() runs the simulation. Arguments:
+# tw_sim() runs the simulation. Arguments:
 # iter: number of iterations
 # cores: the number of processing cores to devote to the simulation (defaults to detectCores())
 # parallel: whether the simulation should run with parallel processing (default = FALSE)
-# ... : arguments passed to twsimdata()
+# ... : arguments passed to tw_data()
 ###################################################
 
 
@@ -78,22 +78,115 @@ gen_errormat <- function(data, time.ac, spatial.ac){
       return(eps)
 }
 
+#' Generate One-way and Two-way Fixed Effects Panel Data
+#' 
+#' This function will produce panel data where variation can exist in the cross-section, over time 
+#' or in both dimensions simultaneously. Furthermore, effect heterogeneity by case or cross section
+#' is also allowed. 
+#' 
+#' The \code{tw_data} function is the workhorse of the \code{twowaysim} package. It accepts as 
+#' input the dimensions of the panel/TSCS data to be generated, and also parameters that 
+#' determine the extent of variance and heterogeneity in either the cross-sectional or 
+#' over-time effects in the data. The parameter \code{N} determines how many observations
+#' exist for each case or unit in the panel, while \code{T} determines how many time points exist 
+#' per case or unit. To create a model with a within-unit over-time (case) effect,
+#' simply set \code{case.eff.mean} to a non-zero number and set \code{case.eff.sd} to zero. Similarly, 
+#' setting \code{cross.eff.mean} to a non-zero number and \code{cross.eff.sd} to zero will produce a 
+#' panel dataset with a cross-sectional effect of X on Y where the effect of X does not vary across
+#' countries (no effect heterogeneity). Increasing \code{cross.eff.sd} and \code{case.eff.sd} will result in more
+#' effect heterogeneity across countries and time points. If both \code{case.eff.mean} and \code{cross.eff.mean} are
+#' non-zero, then Y will have both dimensions of variance. A 1-way fixed effects model with intercepts on 
+#' cases will return the \code{case.eff.mean} coefficient and a model with intercepts on time points will return
+#' the \code{cross.eff.mean} estimate, whereas a 2-way model (intercepts on cases and time points) will return 
+#' a difficult-to-characterize weighted average. We refer you to Kropko and Kubinec (2018) for more information
+#' on the difference between these models: 
+#' \url{https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3062619}. 
+#' 
+#' The parameters \code{case.int} and \code{cross.int} represent the values of the intercepts for the
+#' cases or time points. Changing these parameters will increase or decrease the amount of unexplained
+#' variance in the dataset.
+#' 
+#' The additional parameters in the function allow the user to create unbalanced panels (varying numbers
+#' of observations per case or time point if \code{unbalance=TRUE}), auto-correlation in the effects and 
+#' omitted variables. Autocorrelation can exist either in the over time dimension or the cross-sectional 
+#' dimension. To increase time autocorrelation, set \code{time.ac} to a value between 0 and 1 where values
+#' closer to one signal higher autocorrelation. To increase spatial (cross-sectional) autocorrelation, 
+#' set \code{spatial.ac} to a value between 0 and 1. 
+#' 
+#' Finally, to include omitted variables, set one of the \code{omm} parameters to a non-zero value. 
+#' Omitted variables that vary within cases (over time) can be included by setting an \code{omm} parameter
+#' subscripted with \code{case} to a non-zero value, and the same is possible for variables that vary
+#' in the cross-section \code{cross}. The analyst can also decide whether the omitted variable is correlated
+#' with the independent variable of interest \code{x} or the dependent variable \code{y} by choosing the
+#' subscript of \code{omm}.
+#' 
+#' @return The function returns a named list where \code{object$data} is a \code{data.frame} and 
+#' \code{object$pars} are the original parametes used to generate the data.
+#' 
+#' @examples 
+#' 
+#' # case (over-time) effect with no effect heterogeneity
+#' 
+#' case1 <- tw_data(case.eff.mean=-1,case.eff.sd=0)
+#' 
+#' # case (over-time) effect with substantial effect heterogeneity across countries
+#' 
+#' case2 <- tw_data(case.eff.mean=-1,case.eff.sd=1)
+#' 
+#' # cross-section effect with no effect heterogeneity
+#' 
+#' cross1 <- tw_data(cross.eff.mean=-1,cross.eff.sd=0)
+#' 
+#' # cross-section effect with substantial effect heterogeneity across countries
+#' 
+#' cross2 <- tw_data(cross.eff.mean=-1,cross.eff.sd=1)
+#' 
+#' # panel data with a cross-sectional effect of 3 and a case (over-time) effect of -1
+#' 
+#' both_case_cross <- tw_data(cross.eff.mean=3,
+#'                              case.eff.mean=-1)
+#' 
+#' @seealso \code{\link{tw_model}} for running linear models on the data and and 
+#' \code{\link{tw_sim}} function for running Monte Carlo simulations on panel data.
+#' 
+#' @param N The number of observations for each case/unit.
+#' @param T The number of time points per observation.
+#' @param case.int.mean The mean of the case/unit intercepts/fixed effects
+#' @param case.int.sd The SD of the case/unit intercepts/fixed effects
+#' @param cross.int.mean The mean of the cross-sectional intercepts/fixed effects
+#' @param cross.int.sd The SD of the cross-sectional intercepts/fixed effects
+#' @param cross.eff.mean The mean of the cross-sectional effect of X on Y
+#' @param cross.eff.sd The SD of the cross-sectional effect of X on Y
+#' @param case.eff.mean The mean of the case (over-time) effect of X on Y
+#' @param case.eff.sd The SD of the case (over-time) effect of X on Y
+#' @param noise.sd The residual variance of the data
+#' @param omm.x.case The value of an omitted variable correlated with X that varies across cases/units
+#' @param omm.x.cross The value of an omitted variable correlated with X that varies cross-sectionally
+#' @param omm.y.case The value of an omitted variable correlated with Y that varies across cases/units
+#' @param omm.y.cross The value of an omitted variable correlated with Y that varies cross-sectionally
+#' @param binary Whether to generate a continuous outcome/DV or a binary outcome/DV 
+#' @param unbalance Whether to simulate varying numbers of observations by cases or time points.
+#' @param time.ac A value between 0 and 1 giving the over-time autocorrelation in effect of X on Y
+#' @param spatial.ac A value between 0 and 1 giving the cross-sectional (spatial) 
+#' autocorrelation in the effect of X on Y
+#' 
+#' 
 #' @export
-twsimdata <- function(N = 30, T = 30, alpha.i.mean = 0, alpha.i.sd = 1, 
-                      alpha.t.mean = 0, alpha.t.sd = 1, beta.mean = 3, 
-                      beta.sd = .5, gamma.mean = -3, gamma.sd = .5, noise.sd = 1, 
-                      eta1.i = 0, eta1.t = 0, eta2.i = 0, eta2.t = 0, 
+tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1, 
+                      cross.int.mean = 0, cross.int.sd = 1, cross.eff.mean = 3, 
+                      cross.eff.sd = .5, case.eff.mean = -3, case.eff.sd = .5, noise.sd = 1, 
+                      omm.x.case = 0, omm.x.cross = 0, omm.y.case = 0, omm.y.cross = 0, 
                       binary = FALSE, unbalance = FALSE, time.ac = 0, spatial.ac = 0){
 
       bet.data <- data.frame(case=1:N, 
-                             alpha.i=rnorm(N, mean=alpha.i.mean, sd=alpha.i.sd), 
-                             gamma=rnorm(N, mean=gamma.mean, sd=gamma.sd), 
+                             alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd), 
+                             gamma=rnorm(N, mean=case.eff.mean, sd=case.eff.sd), 
                              zi=rnorm(N), 
                              unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
                              one=1)
       with.data <- data.frame(time=1:T, 
-                              alpha.t=rnorm(T, mean=alpha.t.mean, sd=alpha.t.sd), 
-                              beta=rnorm(T, mean=beta.mean, sd=beta.sd), 
+                              alpha.t=rnorm(T, mean=cross.int.mean, sd=cross.int.sd), 
+                              beta=rnorm(T, mean=cross.eff.mean, sd=cross.eff.sd), 
                               zt=rnorm(T), 
                               one=1)
       data <- full_join(bet.data, with.data, by="one")
@@ -101,8 +194,8 @@ twsimdata <- function(N = 30, T = 30, alpha.i.mean = 0, alpha.i.sd = 1,
         # if no autocorrelation, much faster to just use rnorm
         data <- data %>%
               mutate(noise=rnorm(n=N*T,sd=noise.sd),
-                     x=(alpha.i-alpha.t)/(beta - gamma) + eta1.i*zi + eta1.t*zt, 
-                     y=(beta*alpha.i-gamma*alpha.t)/(beta - gamma) + eta2.i*zi + eta2.t*zt + noise,
+                     x=(alpha.i-alpha.t)/(beta - gamma) + omm.x.case*zi + omm.x.cross*zt, 
+                     y=(beta*alpha.i-gamma*alpha.t)/(beta - gamma) + omm.y.case*zi + omm.y.cross*zt + noise,
                      tokeep = time <= unbal) %>%
               dplyr::select(case, time, y, x, gamma, beta, alpha.i, alpha.t, noise, 
                             zi, zt, tokeep) %>%
@@ -111,8 +204,8 @@ twsimdata <- function(N = 30, T = 30, alpha.i.mean = 0, alpha.i.sd = 1,
         eps <- gen_errormat(data, time.ac, spatial.ac)
         data <- data %>%
           mutate(noise=mvrnorm(n=1, mu=rep(0, N*T), Sigma=eps)*noise.sd,
-                 x=(alpha.i-alpha.t)/(beta - gamma) + eta1.i*zi + eta1.t*zt, 
-                 y=(beta*alpha.i-gamma*alpha.t)/(beta - gamma) + eta2.i*zi + eta2.t*zt + noise,
+                 x=(alpha.i-alpha.t)/(beta - gamma) + omm.x.case*zi + omm.x.cross*zt, 
+                 y=(beta*alpha.i-gamma*alpha.t)/(beta - gamma) + omm.y.case*zi + omm.y.cross*zt + noise,
                  tokeep = time <= unbal) %>%
           dplyr::select(case, time, y, x, gamma, beta, alpha.i, alpha.t, noise, 
                         zi, zt, tokeep) %>%
@@ -120,10 +213,10 @@ twsimdata <- function(N = 30, T = 30, alpha.i.mean = 0, alpha.i.sd = 1,
       }
       if(binary) data <- mutate(data, x=(x>=median(x)))
       
-      pars <- data.frame(N = N, T = T, alpha.i.mean = alpha.i.mean, alpha.i.sd = alpha.i.sd, 
-                      alpha.t.mean = alpha.t.mean, alpha.t.sd = alpha.t.sd, beta.mean = beta.mean, 
-                      beta.sd = beta.sd, gamma.mean = gamma.mean, gamma.sd = gamma.sd, noise.sd = noise.sd, 
-                      eta1.i = eta1.i, eta1.t = eta1.t, eta2.i = eta2.i, eta2.t = eta2.t, 
+      pars <- data.frame(N = N, T = T, case.int.mean = case.int.mean, case.int.sd = case.int.sd, 
+                      cross.int.mean = cross.int.mean, cross.int.sd = cross.int.sd, cross.eff.mean = cross.eff.mean, 
+                      cross.eff.sd = cross.eff.sd, case.eff.mean = case.eff.mean, case.eff.sd = case.eff.sd, noise.sd = noise.sd, 
+                      omm.x.case = omm.x.case, omm.x.cross = omm.x.cross, omm.y.case = omm.y.case, omm.y.cross = omm.y.cross, 
                       binary = binary, unbalance = unbalance, time.ac = time.ac, spatial.ac = spatial.ac)
       toreturn <- list(data, pars)
       names(toreturn) <- c("data", "pars")
@@ -173,11 +266,11 @@ twreg <- function(d){
 }
 
 #' @export
-twmodel <- function(d, re_vt=TRUE){
+tw_model <- function(d, re_vt=TRUE){
       data <- d$data
       pars <- d$pars
       
-      require(plm)
+
       pdata <- data[,apply(data, 2, sd)!=0]
       pdata.time <- pdata.frame(pdata, index=c("case","time"), row.names=FALSE)
       pdata.xs <- pdata.frame(pdata, index=c("time","case"), row.names=FALSE)
@@ -231,7 +324,7 @@ twmodel <- function(d, re_vt=TRUE){
 
 #' @export
 twtransform <- function(d){
-      require(dplyr)
+
       pars <- d$pars
       data <- d$data
       if(pars$unbalance) data <- filter(data, tokeep)
@@ -288,14 +381,51 @@ twtrans2 <- function(data){
       return(p)
 }
 
+#' Run Monte Carlo Simulations on Panel Data
+#' 
+#' Use this function to run our own Monte Carlo experiments on panel data.
+#' 
+#' The \code{tw_sim} function acts as a frontend to the \code{link{tw_data}} function that 
+#' generates panel data given a set of parameters. The arguments are fairly self-explanatory, and 
+#' any underlying panel data parameters are passed on to \code{link{tw_data}}, so review that help
+#' site for more information. The simulation works by passing a character value of one of the 
+#' parameters from the \code{link{tw_data}} function to the \code{arg} option, such as \code{cross.eff.mean}
+#' for varying cross-sectional effects. The \code{at} option must take a numeric vector giving the range of
+#' values to iterate over, such as \code{seq(-1,1,by=.1)} to test values of \code{cross.eff.mean} from
+#' -1 to 1 in increments of .1.
+#' 
+#' @return This function returns a \code{data.frame} with the two-way fixed effects coefficient, 
+#' both case (over-time) and cross-sectional 1-way fixed effects estimates, pooled OLS model
+#' estimates, and a random-effects estimate. Each row of the \code{data.frame} represents
+#' one sample of panel data drawn from \code{link{tw_data}}. This data can then be plotted with the 
+#' \code{\link{tw_plot}} function to see results of the simulation.
+#' 
+#' @examples 
+#' \dontrun{
+#'  ex_sim <- tw_sim(iter=150,arg='case.eff.mean',at=seq(-5,5,by=.1))
+#' 
+#' }
+#' 
+#' @param iter The number of Monte Carlo simulations to run. This effects the precision of the estimates.
+#' @param cores The number of cores to run the simulations in parallel.
+#' @param parallel whether to use parallel processing if \code{cores>1}.
+#' @param arg A character value of which model parameter from \code{link{tw_data}} to vary across simulations.
+#' @param at A numeric sequence giving the range of values of the \code{arg} parameter to vary across.
+#' @param re_vt Whether to also report estimates of random effects for the cross-section 
+#' instead of only within cases.
+#' @param ... All additional parameters to pass on to \code{link{tw_data}}, such as 
+#' average effects in case or cross-sectional dimensions of the data.
+#' 
+#' @import plm
 #' @export
-twsim <- function(iter=1000, cores=NULL, parallel=FALSE, arg, at, verbose=TRUE, re_vt=TRUE, ...){
+tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
+                   at=seq(-1,1,by = .1), re_vt=TRUE, ...){
       el <- expand.grid(iteration = 1:iter, arg = at)
       if(parallel){
             if(file.exists('output.txt')) file.remove('output.txt')
-            loopfun <- ifelse(verbose, pbmclapply::pbmclapply, parallel::mclapply)
+            #loopfun <- ifelse(verbose, pbmclapply::pbmclapply, parallel::mclapply)
             if(is.null(cores)) cores <- parallel::detectCores()
-            p <- loopfun(1:nrow(el), FUN=function(x){
+            p <- mclapply(1:nrow(el), FUN=function(x){
                   sink('output.txt',append = T)
                   print(paste0('Now on row ',x, ' out of ',nrow(el),' rows in the simulation.'))
                   sink()
@@ -303,21 +433,21 @@ twsim <- function(iter=1000, cores=NULL, parallel=FALSE, arg, at, verbose=TRUE, 
                   names(z) <- arg
                   extra.args <- as.list(substitute(list(...)))[-1L]
                   z<-c(z,extra.args)
-                  d <- do.call(twsimdata, args=z)
-                  m <- twmodel(d, re_vt=re_vt)
+                  d <- do.call(tw_data, args=z)
+                  m <- tw_model(d, re_vt=re_vt)
                   m <- sapply(m, FUN=function(x){x}, simplify=TRUE)
                   return(c(el[x,2], m[,2]))
             }, mc.cores=cores) 
             p <- sapply(p, FUN=function(x){x}, simplify=TRUE)
       } else {
             p <- sapply(1:nrow(el), FUN=function(x){
-                  if(verbose) print(el[x,])
+                  print(el[x,])
                   z <- list(foo = el[x,2])
                   extra.args <- as.list(substitute(list(...)))[-1L]
                   z<-c(z,extra.args)
                   names(z) <- arg
-                  d <- do.call(twsimdata, args=z)
-                  m <- twmodel(d, re_vt=re_vt)
+                  d <- do.call(tw_data, args=z)
+                  m <- tw_model(d, re_vt=re_vt)
                   m <- sapply(m, FUN=function(x){x}, simplify=TRUE)
                   return(c(el[x,2], m[,2]))      
             })
@@ -328,7 +458,16 @@ twsim <- function(iter=1000, cores=NULL, parallel=FALSE, arg, at, verbose=TRUE, 
       } else {
         colnames(p) <- c(arg, "Two-way FE", "Case FE", "Time FE", "Pooled OLS","RE (u_i)")
       }
+     p <- gather(p, `Two-way FE`:`RE (v_t)`, key="Model", value="Coefficient",
+                     factor_key=TRUE)
       return(p)
 }
 
+#' Plot Results of \code{tw_sim} simulations
+#' 
+#' This function will generate plots comparing the performance of different estimators
+#' at returning \code{\link{tw_sim}} Monte Carlo simulations.
+tw_plot_sim <- function(object,...) {
+  
+}
 
