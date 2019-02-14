@@ -5,7 +5,7 @@
 \title{Run Monte Carlo Simulations on Panel Data}
 \usage{
 tw_sim(iter = 1000, cores = 1, parallel = FALSE,
-  arg = "cross.eff.mean", at = seq(-1, 1, by = 0.1), re_vt = TRUE,
+  arg = "cross.eff.mean", at = seq(-1, 1, by = 0.1), randomfx = TRUE,
   ...)
 }
 \arguments{
@@ -19,7 +19,7 @@ tw_sim(iter = 1000, cores = 1, parallel = FALSE,
 
 \item{at}{A numeric sequence giving the range of values of the \code{arg} parameter to vary across.}
 
-\item{re_vt}{Whether to also report estimates of random effects for the cross-section 
+\item{randomfx}{Whether to also report estimates of random effects for the cross-section 
 instead of only within cases.}
 
 \item{...}{All additional parameters to pass on to \code{link{tw_data}}, such as 
@@ -33,7 +33,7 @@ one sample of panel data drawn from \code{link{tw_data}}. This data can then be 
 \code{\link{tw_plot}} function to see results of the simulation.
 }
 \description{
-Use this function to run our own Monte Carlo experiments on panel data.
+Use this function to run your own Monte Carlo experiments on panel data.
 }
 \details{
 The \code{tw_sim} function acts as a frontend to the \code{link{tw_data}} function that 

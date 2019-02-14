@@ -75,13 +75,15 @@ effect heterogeneity across countries and time points. If both \code{case.eff.me
 non-zero, then Y will have both dimensions of variance. A 1-way fixed effects model with intercepts on 
 cases will return the \code{case.eff.mean} coefficient and a model with intercepts on time points will return
 the \code{cross.eff.mean} estimate, whereas a 2-way model (intercepts on cases and time points) will return 
-a difficult-to-characterize weighted average. We refer you to Kropko and Kubinec (2018) for more information
+a difficult-to-characterize weighted average.
+
+We refer you to Kropko and Kubinec (2018) for more information
 on the difference between these models: 
 \url{https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3062619}.
 
 The parameters \code{case.int} and \code{cross.int} represent the values of the intercepts for the
 cases or time points. Changing these parameters will increase or decrease the amount of unexplained
-variance in the dataset.
+variance (random noise) in the dataset.
 
 The additional parameters in the function allow the user to create unbalanced panels (varying numbers
 of observations per case or time point if \code{unbalance=TRUE}), auto-correlation in the effects and 
