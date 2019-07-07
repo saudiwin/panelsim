@@ -451,46 +451,97 @@ twtrans2 <- function(data){
 #' @importFrom plm plm pdata.frame
 #' @export
 tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
-                   at=seq(-1,1,by = .1), randomfx=TRUE, ...){
-      el <- expand.grid(iteration = 1:iter, arg = at)
+                   at1=seq(-1,1,by = .1), 
+                   at2=NULL,randomfx=TRUE, ...){
+      
+
+  
+      if(is.null(at2)) {
+        el <- expand.grid(iteration = 1:iter, input1 = at1, arg=arg)
+        # split to help with parallel processing
+        split_el <- split(el,list(el$input,el$iteration))
+      } else {
+        el <- expand.grid(iteration = 1:iter, input1 = at1, input2=at2,arg=arg)
+        # split to help with parallel processing
+        split_el <- split(el,list(el$input1,el$input2,el$iteration))
+      }
+      
+      
       if(parallel){
             if(file.exists('output.txt')) file.remove('output.txt')
             #loopfun <- ifelse(verbose, pbmclapply::pbmclapply, parallel::mclapply)
             if(is.null(cores)) cores <- parallel::detectCores()
-            p <- mclapply(1:nrow(el), FUN=function(x){
+            p <- mclapply(split_el, FUN=function(el){
                   sink('output.txt',append = T)
-                  print(paste0('Now on row ',x, ' out of ',nrow(el),' rows in the simulation.'))
+                    print(paste0('Now on iteration ',el$iteration[1], ' of input ',
+                           el$input1[1], ' for parameter ',el$arg[1],collapse=" "))
                   sink()
-                  z <- list(foo = el[x,2])
-                  names(z) <- arg
+                  
+                  z <- list(foo = el$input1[1])
+                  names(z) <- el$arg[1]
                   extra.args <- as.list(substitute(list(...)))[-1L]
-                  z<-c(z,extra.args)
+                  if(length(el$arg)>1) {
+                    other_z <- list(foo = el$input2[1])
+                    names(other_z) <- el$arg[2]
+                    z<-c(z,other_z,extra.args)
+                  } else {
+                    z<-c(z,extra.args)
+                  }
+                  
                   d <- do.call(tw_data, args=z)
                   m <- tw_model(d, randomfx=randomfx)
-                  return(c(el$arg[x], m$coef)) 
-            }, mc.cores=cores) 
-            p <- sapply(p, FUN=function(x){x}, simplify=TRUE)
+                  m$iteration <- el$iteration
+                  
+                  out <- data_frame(input1=unique(el$input1),
+                                    iteration=unique(el$iteration))
+                  names(out) <- c(as.character(el$arg[1]),'iteration')
+                  
+                  if(length(el$arg)>1) {
+                    out <- mutate(out,
+                                  input2=unique(el$input2))
+                    names(out)[names(out)=='input2'] <- as.character(el$arg[2])
+                  }
+                  out <- left_join(out,m,by='iteration')  
+                   
+            }, mc.cores=cores)  %>% bind_rows
+            
       } else {
 
-            p <- sapply(1:nrow(el), FUN=function(x){
-                  print(el[x,])
-                  z <- list(foo = el[x,2])
-                  extra.args <- as.list(substitute(list(...)))[-1L]
-                  z<-c(z,extra.args)
-                  names(z) <- arg
-                  d <- do.call(tw_data, args=z)
-                  m <- tw_model(d, randomfx=randomfx)
-                  return(c(el$arg[x], m$coef))      
-            })
+        p <- lapply(split_el, FUN=function(el){
+          sink('output.txt',append = T)
+          print(paste0('Now on iteration ',el$iteration[1], ' of input ',
+                       el$input1[1], ' for parameter ',el$arg[1],collapse=" "))
+          sink()
+          
+          z <- list(foo = el$input1[1])
+          names(z) <- el$arg[1]
+          extra.args <- as.list(substitute(list(...)))[-1L]
+          if(length(el$arg)>1) {
+            other_z <- list(foo = el$input2[1])
+            names(other_z) <- el$arg[2]
+            z<-c(z,other_z,extra.args)
+          } else {
+            z<-c(z,extra.args)
+          }
+          
+          d <- do.call(tw_data, args=z)
+          m <- tw_model(d, randomfx=randomfx)
+          m$iteration <- el$iteration
+          
+          out <- data_frame(input1=unique(el$input1),
+                            iteration=unique(el$iteration))
+          names(out) <- c(as.character(el$arg[1]),'iteration')
+          
+          if(length(el$arg)>1) {
+            out <- mutate(out,
+                          input2=unique(el$input2))
+            names(out)[names(out)=='input2'] <- as.character(el$arg[2])
+          }
+          out <- left_join(out,m,by='iteration')  
+          
+        })  %>% bind_rows
       }
-      p <- data.frame(t(p))
-      if(randomfx){
-        colnames(p) <- c(arg, "Two-way FE", "Case FE", "Time FE", "Pooled OLS","Random Case", "Random Time")
-      } else {
-        colnames(p) <- c(arg, "Two-way FE", "Case FE", "Time FE", "Pooled OLS","Random Case")
-      }
-     p <- gather(p, `Two-way FE`:`RE (v_t)`, key="Model", value="Coefficient",
-                     factor_key=TRUE)
+      
       return(p)
 }
 
@@ -500,36 +551,64 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
 #' at returning \code{\link{tw_sim}} Monte Carlo simulations.
 #' 
 #' @param gensim A set of simulations produced by \code{\link{tw_sim}}
+#' @param display_est Whether to display estimated coefficients of 
+#' independent variables from the linear model (\code("coef")) or the
+#' standard error of these estimates (\code{"se"})
 #' @param use_ci Whether to add confidence intervals around LOESS curves.
 #' Turn off if the CIs are too big relative to plot.
+#' @param xvar In case of multiple attributes varied in the simulation, which 
+#' attribute should be on the x axis? See \code{\link{tw_data}} for possible
+#' attribute names. Should be an unquoted variable name like 
+#' \code{case.int.sd}.
+#' @param yvar In case of multiple attributes varied in the simulation, which 
+#' attribute should be on the x axis? See \code{\link{tw_data}} for possible
+#' attribute names. Should be an unquoted variable name like 
+#' \code{case.int.sd}.
 #' @param ... Currently ignored
 #' 
 #' @import ggplot2
 #' @export
 tw_plot <- function(gensim,
+                    display_est='coef',
                     use_ci=T,
+                    xvar=NULL,
+                    yvar=NULL,
                     ...) {
 
-  plot_data <- gensim %>% 
-    gather(key='Type of\nVariance',
-           value='True\nEffect',
-           -Model,-Coefficient)
   
-  out_plot <- plot_data %>%  ggplot(aes(y=Coefficient,
-               x=`True\nEffect`)) +
-    geom_smooth(se=use_ci) +
-    theme(panel.grid = element_blank(),
-          panel.background = element_blank(),
-          strip.background = element_blank(),
-          strip.text = element_text(face="bold")) +
-    geom_line(aes(y=`True\nEffect`,
-                  x=`True\nEffect`),
-              linetype=2)
+  att_data <- select(gensim,-iteration,-model,-coef,-se)
+  att_names <- names(att_data)
   
-  if(length(unique(plot_data$`Type of\nVariance`))>1) {
-    return(out_plot + facet_wrap(~`Type of\nVariance`+Model))
+  
+  # different plots for whether we have one or two contrasts
+  
+  if(length(att_names)>1) {
+    
+    if(is.null(xvar) || is.null(yvar)) {
+      gensim %>% 
+        ggplot(aes(y=!! sym(att_names[1]),
+                    x=!! sym(att_names[2]))) + 
+          geom_raster(aes(fill=!! sym(display_est))) + 
+          facet_wrap(~model)
+    } else {
+      gensim %>% 
+        ggplot(aes_(y=!! enquo(yvar),
+                    x=!! enquo(xvar))) + 
+        geom_raster(aes(fill=coef)) + 
+        facet_wrap(~model)
+    }
   } else {
-    return(out_plot + facet_wrap(~Model))
+    
+    gensim %>%  ggplot(aes(y= !! sym(display_est),
+                                          x=!! sym(att_names))) +
+      geom_smooth(se=use_ci,aes(colour=model,linetype=model)) +
+      theme(panel.grid = element_blank(),
+            panel.background = element_blank(),
+            strip.background = element_blank(),
+            strip.text = element_text(face="bold")) +
+      ylab("Estimated Coefficient") +
+      xlab(paste0("Fixed Value for ",att_names))
   }
+  
 }
 
