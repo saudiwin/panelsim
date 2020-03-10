@@ -4,9 +4,18 @@
 \alias{mclapply}
 \title{Overwrite the serial version of mclapply on Windows only}
 \usage{
-mclapply(X, FUN, ..., mc.preschedule = TRUE, mc.set.seed = TRUE,
-  mc.silent = FALSE, mc.cores = NULL, mc.cleanup = TRUE,
-  mc.allow.recursive = TRUE)
+mclapply(
+  X,
+  FUN,
+  ...,
+  mc.preschedule = TRUE,
+  mc.set.seed = TRUE,
+  mc.silent = FALSE,
+  mc.cores = getOption("mc.cores", 2L),
+  mc.cleanup = TRUE,
+  mc.allow.recursive = TRUE,
+  affinity.list = NULL
+)
 }
 \arguments{
 \item{empty}{it takes nothing}

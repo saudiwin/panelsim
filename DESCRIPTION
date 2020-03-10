@@ -1,12 +1,12 @@
-Package: twowaysim
+Package: panelsim
 Type: Package
 Title: Simulation of Panel and Hierarchical Datasets with Varying Effects
 Version: 0.3
-Date: 2018-12-03
+Date: 2020-03-10
 Author: Jonathan Kropko and Robert Kubinec 
 Maintainer: Robert Kubinec <rmk7xy@virginia.edu>
 Description: Simulation of panel/hierarchical data that allows for independently generating effects by cross-section and case, including auto-correlation in either dimension.
-Imports: dplyr,plm,MASS,sandwich,RSQLite
+Imports: dplyr,plm,MASS,sandwich,RSQLite,gsynth,wfe
 License: GPL
 LazyData: FALSE
-RoxygenNote: 6.1.1
+RoxygenNote: 7.0.2

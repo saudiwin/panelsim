@@ -1,6 +1,5 @@
 ###################################################
-# Simulation files for "Why You Can’t Control Both Space and Time: 
-# Reassessing Fixed Effects"
+# Simulation files for "Interpretation and Identification of Within-unit and Cross-sectional Variation in Panel Data Models"
 #
 # Jonathan Kropko
 # jkropko@virginia.edu
@@ -184,16 +183,19 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
                       cross.eff.sd = .5, case.eff.mean = -3, case.eff.sd = .5, noise.sd = 1, 
                       omm.x.case = 0, omm.x.cross = 0, omm.y.case = 0, omm.y.cross = 0, 
                       binary = FALSE, unbalance = FALSE, time.ac = 0, spatial.ac = 0){
+  
 
       bet.data <- data.frame(case=1:N, 
                              alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd), 
-                             gamma=rnorm(N, mean=case.eff.mean, sd=case.eff.sd), 
+                             gamma=ifelse(case.eff.sd>0,rnorm(N, mean=case.eff.mean, sd=case.eff.sd),
+                                           case.eff.mean),
                              zi=rnorm(N), 
                              unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
                              one=1)
       with.data <- data.frame(time=1:T, 
                               alpha.t=rnorm(T, mean=cross.int.mean, sd=cross.int.sd), 
-                              beta=rnorm(T, mean=cross.eff.mean, sd=cross.eff.sd), 
+                              beta=ifelse(cross.eff.sd>0,rnorm(T, mean=cross.eff.mean, sd=cross.eff.sd), 
+                                          cross.eff.mean),
                               zt=rnorm(T), 
                               one=1)
       data <- full_join(bet.data, with.data, by="one")
@@ -297,60 +299,123 @@ tw_reg <- function(d){
 #' estimates <- tw_model(gendata)
 #' }
 #' 
+#' 
+#' @import gsynth
+#' @import wfe
 #' @export
-tw_model <- function(gendata, randomfx=TRUE){
+tw_model <- function(gendata, models=c("randomfx","wfe","gsynth")){
+  
+  
       data <- gendata$data
       pars <- gendata$pars
       
-
       pdata <- data[,apply(data, 2, sd)!=0]
-      pdata.time <- pdata.frame(pdata, index=c("case","time"), row.names=FALSE)
-      pdata.xs <- pdata.frame(pdata, index=c("time","case"), row.names=FALSE)
+      pdata <- select(pdata,time_id="time",everything())
+      pdata.time <- pdata.frame(as.data.frame(pdata), index=c("case","time_id"), row.names=FALSE,drop.index = T)
+      pdata.xs <- pdata.frame(as.data.frame(pdata), index=c("time_id","case"), row.names=FALSE,drop.index = T)
       
+      # need to add binary x for wfe/gsynth
+      pdata$bin_x <- as.numeric(pdata$x>median(pdata$x))
       #1) Pooled OLS
       pooled.ols <- lm(y ~ x, data=data)
       
       #2) One way FEs
-      #case.fe.dummy <- lm(y ~ x + factor(case), data=data)
-      #time.fe.dummy <- lm(y ~ x + factor(time), data=data)
+      browser()
       case.fe.plm <- plm(y ~ x, model="within", data=pdata.time)
       time.fe.plm <- plm(y ~ x, model="within", data=pdata.xs)
       
       #3) Random effects
-      if(randomfx) random.xs <- plm(y ~ x, model="random", data=pdata.xs)
-      random.time <- plm(y ~ x, model="random", data=pdata.time)
-      
+      if("randomfx" %in% models) {
+        random.xs <- plm(y ~ x, model="random", data=pdata.xs)
+        random.time <- plm(y ~ x, model="random", data=pdata.time)
+        
+        random_time_coef <- summary(random.time)$coefficients[2,1]
+        random_time_se <- summary(random.time)$coefficients[2,2]
+        random_time_pval <- summary(random.time)$coefficients[2,4]
+        
+        random_xs_coef <- summary(random.xs)$coefficients[2,1]
+        random_xs_se <- summary(random.xs)$coefficients[2,2]
+        random_xs_pval <- summary(random.xs)$coefficients[2,4]
+      }
+
       #4) Twoway FE
       twoway.fe <- lm(y ~ x + factor(case) + factor(time), data=data)
       identified <- all(!is.na(coef(twoway.fe)))
-      twcoef <- ifelse(identified, summary(twoway.fe)$coefficients[2,1], NA)
-      twse <- ifelse(identified, summary(twoway.fe)$coefficients[2,2], NA)
+      twcoef <- summary(twoway.fe)$coefficients[2,1]
+      twse <- summary(twoway.fe)$coefficients[2,2]
+      tw_pval <- summary(twoway.fe)$coefficients[2,4]
+      
+      if("gsynth" %in% models) {
+        
+        gsynth_out <- try(suppressMessages(gsynth(formula = y~bin_x,index=c("case","time_id"),data=pdata,se=T)))
+        
+        if(!('try-error' %in% class(gsynth_out))) {
+          coef_gsynth <- gsynth_out$est.avg[,"ATT.avg"]
+          p_gsynth <- gsynth_out$est.avg[,"p.value"]
+          se_gsynth <- gsynth_out$est.avg[,"S.E."]
+        } else {
+          print(paste("R package gsynth failed to estimate because of ",gsynth_out))
+          coef_gsynth <- NA
+          p_gsynth <- NA
+          se_gsynth <- NA
+        }
+        
+      }
+      
+      if("wfe" %in% models) {
+        wfe_out <- try(suppressMessages(wfe(y~bin_x,data=pdata,treat="bin_x",unit.index="case",time.index="time_id")))
+        
+        if(!('try-error' %in% class(wfe_out))) {
+          sum_wfe <- summary(wfe_out)
+          coef_wfe <- sum_wfe$coefficients[,"Estimate"]
+          p_wfe <- sum_wfe$coefficients[,"p.value"]
+          se_wfe <- sum_wfe$coefficients[,"Std.Error"]
+        } else {
+          print(paste("R package wfe failed to estimate because of ",wfe_out))
+          coef_wfe <- NA
+          p_wfe <- NA
+          se_wfe <- NA
+        }
+        
+        
+      }
       
       ### Compile saved results in a data frame  
-      results <- data.frame(
+      results <- tibble(
             model = c("Two-way FE", "Case FE", "Time FE", "Pooled OLS",
-                      "RE (u_i)"),
+                      "RE (u_i)","RE (v_t)","Generalized\nSynthetic\nControl","Weighted\nFixed Effects"),
             coef = c(twcoef,
                      #summary(case.fe.dummy)$coefficients[2,1],
                      summary(case.fe.plm)$coefficients[1,1],
                      #summary(time.fe.dummy)$coefficients[2,1],
                      summary(time.fe.plm)$coefficients[1,1],
                      summary(pooled.ols)$coefficients[2,1],
-                     summary(random.time)$coefficients[2,1]),
+                     random_time_coef,
+                     random_xs_coef,
+                     coef_gsynth,
+                     coef_wfe),
             se = c(twse,
                   # summary(case.fe.dummy)$coefficients[2,2],
                    summary(case.fe.plm)$coefficients[1,2],
                    #summary(time.fe.dummy)$coefficients[2,2],
                    summary(time.fe.plm)$coefficients[1,2],
                    summary(pooled.ols)$coefficients[2,2],
-                   summary(random.time)$coefficients[2,2])
+                  random_time_se,
+                  random_xs_se,
+                  se_gsynth,
+                  se_wfe),
+            p_val = c(tw_pval,
+                      summary(case.fe.plm)$coefficients[1,4],
+                      #summary(time.fe.dummy)$coefficients[2,2],
+                      summary(time.fe.plm)$coefficients[1,4],
+                      summary(pooled.ols)$coefficients[2,4],
+                      random_time_pval,
+                      random_xs_pval,
+                      p_gsynth,
+                      p_wfe),
+            tw_id=identified
       )
-      if(randomfx){
-        results_vt <- data.frame(model = "RE (v_t)", 
-                                 coef = summary(random.xs)$coefficients[2,1],
-                                 se = summary(random.xs)$coefficients[2,2])
-        results <- bind_rows(results, results_vt)
-      }
+
       return(results)
 }
 
@@ -443,8 +508,7 @@ twtrans2 <- function(data){
 #' @param parallel whether to use parallel processing if \code{cores>1}.
 #' @param arg A character value of which model parameter from \code{link{tw_data}} to vary across simulations.
 #' @param at A numeric sequence giving the range of values of the \code{arg} parameter to vary across.
-#' @param randomfx Whether to also report estimates of random effects for the cross-section 
-#' instead of only within cases.
+#' @param models A list of additional models besides fixed effects models to fit to the data.
 #' @param ... All additional parameters to pass on to \code{link{tw_data}}, such as 
 #' average effects in case or cross-sectional dimensions of the data.
 #' 
@@ -452,7 +516,7 @@ twtrans2 <- function(data){
 #' @export
 tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
                    at1=seq(-1,1,by = .1), 
-                   at2=NULL,randomfx=TRUE, ...){
+                   at2=NULL, models=c("randomfx","wfe","gsynth"), ...){
       
 
   
@@ -468,7 +532,7 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
       
       
       if(parallel){
-            if(file.exists('output.txt')) file.remove('output.txt')
+            #if(file.exists('output.txt')) file.remove('output.txt')
             #loopfun <- ifelse(verbose, pbmclapply::pbmclapply, parallel::mclapply)
             if(is.null(cores)) cores <- parallel::detectCores()
             p <- mclapply(split_el, FUN=function(el){
@@ -489,7 +553,7 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
                   }
                   
                   d <- do.call(tw_data, args=z)
-                  m <- tw_model(d, randomfx=randomfx)
+                  m <- tw_model(d, models=models)
                   m$iteration <- el$iteration
                   
                   out <- data_frame(input1=unique(el$input1),
@@ -508,10 +572,10 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
       } else {
 
         p <- lapply(split_el, FUN=function(el){
-          sink('output.txt',append = T)
+          
           print(paste0('Now on iteration ',el$iteration[1], ' of input ',
                        el$input1[1], ' for parameter ',el$arg[1],collapse=" "))
-          sink()
+
           
           z <- list(foo = el$input1[1])
           names(z) <- el$arg[1]
@@ -525,7 +589,7 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
           }
           
           d <- do.call(tw_data, args=z)
-          m <- tw_model(d, randomfx=randomfx)
+          m <- tw_model(d, models=models)
           m$iteration <- el$iteration
           
           out <- data_frame(input1=unique(el$input1),
@@ -561,7 +625,7 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
 #' attribute names. Should be an unquoted variable name like 
 #' \code{case.int.sd}.
 #' @param yvar In case of multiple attributes varied in the simulation, which 
-#' attribute should be on the x axis? See \code{\link{tw_data}} for possible
+#' attribute should be on the y axis? See \code{\link{tw_data}} for possible
 #' attribute names. Should be an unquoted variable name like 
 #' \code{case.int.sd}.
 #' @param ... Currently ignored
@@ -601,14 +665,22 @@ tw_plot <- function(gensim,
     
     gensim %>%  ggplot(aes(y= !! sym(display_est),
                                           x=!! sym(att_names))) +
+      geom_abline(slope=1,intercept=0,linetype=2,alpha=0.5) +
       geom_smooth(se=use_ci,aes(colour=model,linetype=model)) +
       theme(panel.grid = element_blank(),
             panel.background = element_blank(),
             strip.background = element_blank(),
             strip.text = element_text(face="bold")) +
       ylab("Estimated Coefficient") +
-      xlab(paste0("Fixed Value for ",att_names))
+      xlab(paste0("Fixed Value for ",att_names)) +
+      facet_wrap(~model)
   }
+  
+}
+
+#' Would like to have a function that can generate power curves
+tw_power <- function(gensim,
+                     ...) {
   
 }
 

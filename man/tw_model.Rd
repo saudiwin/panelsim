@@ -4,7 +4,7 @@
 \alias{tw_model}
 \title{Fit Panel Data Given Simulated Data}
 \usage{
-tw_model(gendata, randomfx = TRUE)
+tw_model(gendata, models = c("randomfx", "wfe", "gsynth"))
 }
 \arguments{
 \item{gendata}{A data frame of simulated panel data procued by 
@@ -32,5 +32,6 @@ gendata <- tw_data()
 # estimate panel models
 estimates <- tw_model(gendata)
 }
+
 
 }

@@ -4,9 +4,16 @@
 \alias{tw_sim}
 \title{Run Monte Carlo Simulations on Panel Data}
 \usage{
-tw_sim(iter = 1000, cores = 1, parallel = FALSE,
-  arg = "cross.eff.mean", at = seq(-1, 1, by = 0.1), randomfx = TRUE,
-  ...)
+tw_sim(
+  iter = 1000,
+  cores = 1,
+  parallel = FALSE,
+  arg = "cross.eff.mean",
+  at1 = seq(-1, 1, by = 0.1),
+  at2 = NULL,
+  models = c("randomfx", "wfe", "gsynth"),
+  ...
+)
 }
 \arguments{
 \item{iter}{The number of Monte Carlo simulations to run. This effects the precision of the estimates.}
@@ -17,13 +24,12 @@ tw_sim(iter = 1000, cores = 1, parallel = FALSE,
 
 \item{arg}{A character value of which model parameter from \code{link{tw_data}} to vary across simulations.}
 
-\item{at}{A numeric sequence giving the range of values of the \code{arg} parameter to vary across.}
-
-\item{randomfx}{Whether to also report estimates of random effects for the cross-section 
-instead of only within cases.}
+\item{models}{A list of additional models besides fixed effects models to fit to the data.}
 
 \item{...}{All additional parameters to pass on to \code{link{tw_data}}, such as 
 average effects in case or cross-sectional dimensions of the data.}
+
+\item{at}{A numeric sequence giving the range of values of the \code{arg} parameter to vary across.}
 }
 \value{
 This function returns a \code{data.frame} with the two-way fixed effects coefficient, 

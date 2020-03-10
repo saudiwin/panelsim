@@ -4,12 +4,27 @@
 \alias{tw_data}
 \title{Generate One-way and Two-way Fixed Effects Panel Data}
 \usage{
-tw_data(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
-  cross.int.mean = 0, cross.int.sd = 1, cross.eff.mean = 3,
-  cross.eff.sd = 0.5, case.eff.mean = -3, case.eff.sd = 0.5,
-  noise.sd = 1, omm.x.case = 0, omm.x.cross = 0, omm.y.case = 0,
-  omm.y.cross = 0, binary = FALSE, unbalance = FALSE, time.ac = 0,
-  spatial.ac = 0)
+tw_data(
+  N = 30,
+  T = 30,
+  case.int.mean = 0,
+  case.int.sd = 1,
+  cross.int.mean = 0,
+  cross.int.sd = 1,
+  cross.eff.mean = 3,
+  cross.eff.sd = 0.5,
+  case.eff.mean = -3,
+  case.eff.sd = 0.5,
+  noise.sd = 1,
+  omm.x.case = 0,
+  omm.x.cross = 0,
+  omm.y.case = 0,
+  omm.y.cross = 0,
+  binary = FALSE,
+  unbalance = FALSE,
+  time.ac = 0,
+  spatial.ac = 0
+)
 }
 \arguments{
 \item{N}{The number of observations for each case/unit.}
@@ -75,11 +90,11 @@ effect heterogeneity across countries and time points. If both \code{case.eff.me
 non-zero, then Y will have both dimensions of variance. A 1-way fixed effects model with intercepts on 
 cases will return the \code{case.eff.mean} coefficient and a model with intercepts on time points will return
 the \code{cross.eff.mean} estimate, whereas a 2-way model (intercepts on cases and time points) will return 
-a difficult-to-characterize weighted average.
+a difficult-to-characterize weighted average. 
 
 We refer you to Kropko and Kubinec (2018) for more information
 on the difference between these models: 
-\url{https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3062619}.
+\url{https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3062619}. 
 
 The parameters \code{case.int} and \code{cross.int} represent the values of the intercepts for the
 cases or time points. Changing these parameters will increase or decrease the amount of unexplained
@@ -90,7 +105,7 @@ of observations per case or time point if \code{unbalance=TRUE}), auto-correlati
 omitted variables. Autocorrelation can exist either in the over time dimension or the cross-sectional 
 dimension. To increase time autocorrelation, set \code{time.ac} to a value between 0 and 1 where values
 closer to one signal higher autocorrelation. To increase spatial (cross-sectional) autocorrelation, 
-set \code{spatial.ac} to a value between 0 and 1.
+set \code{spatial.ac} to a value between 0 and 1. 
 
 Finally, to include omitted variables, set one of the \code{omm} parameters to a non-zero value. 
 Omitted variables that vary within cases (over time) can be included by setting an \code{omm} parameter

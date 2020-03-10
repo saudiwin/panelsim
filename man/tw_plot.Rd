@@ -4,13 +4,34 @@
 \alias{tw_plot}
 \title{Plot Results of \code{tw_sim} simulations}
 \usage{
-tw_plot(gensim, use_ci = T, ...)
+tw_plot(
+  gensim,
+  display_est = "coef",
+  use_ci = T,
+  xvar = NULL,
+  yvar = NULL,
+  ...
+)
 }
 \arguments{
 \item{gensim}{A set of simulations produced by \code{\link{tw_sim}}}
 
+\item{display_est}{Whether to display estimated coefficients of 
+independent variables from the linear model (\code("coef")) or the
+standard error of these estimates (\code{"se"})}
+
 \item{use_ci}{Whether to add confidence intervals around LOESS curves.
 Turn off if the CIs are too big relative to plot.}
+
+\item{xvar}{In case of multiple attributes varied in the simulation, which 
+attribute should be on the x axis? See \code{\link{tw_data}} for possible
+attribute names. Should be an unquoted variable name like 
+\code{case.int.sd}.}
+
+\item{yvar}{In case of multiple attributes varied in the simulation, which 
+attribute should be on the y axis? See \code{\link{tw_data}} for possible
+attribute names. Should be an unquoted variable name like 
+\code{case.int.sd}.}
 
 \item{...}{Currently ignored}
 }
