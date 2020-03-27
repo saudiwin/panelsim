@@ -1,11 +1,11 @@
 Package: panelsim
 Type: Package
-Title: Simulation of Panel and Hierarchical Datasets with Varying Effects
+Title: Simulation and Power Analysis of Panel Data/Multilevel Data
 Version: 0.3
 Date: 2020-03-10
 Author: Jonathan Kropko and Robert Kubinec 
 Maintainer: Robert Kubinec <rmk7xy@virginia.edu>
-Description: Simulation of panel/hierarchical data that allows for independently generating effects by cross-section and case, including auto-correlation in either dimension.
+Description: Simulation and power analysis of panel/multilevel data that allows for independently generating effects by cross-section (between-subject) and case (within-subject), including auto-correlation in either dimension.
 Imports: dplyr,plm,MASS,sandwich,RSQLite,gsynth,wfe
 License: GPL
 LazyData: FALSE

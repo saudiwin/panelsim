@@ -170,7 +170,10 @@ gen_errormat <- function(data, time.ac, spatial.ac){
 #' @param omm.x.cross The value of an omitted variable correlated with X that varies cross-sectionally
 #' @param omm.y.case The value of an omitted variable correlated with Y that varies across cases/units
 #' @param omm.y.cross The value of an omitted variable correlated with Y that varies cross-sectionally
-#' @param binary Whether to generate a continuous outcome/DV or a binary outcome/DV 
+#' @param treat_effect Whether to generate an X variable that is 0/1 (dichotomous treatment). If so,
+#' all effects (case/time/omitted) should be strictly between \code{[0,.9999]} as they will 
+#' be interpreted as probabilities.
+#' @param bin_outcome Whether the Y (outcome) variable should also be simulated as a binary 0/1 variable. 
 #' @param unbalance Whether to simulate varying numbers of observations by cases or time points.
 #' @param time.ac A value between 0 and 1 giving the over-time autocorrelation in effect of X on Y
 #' @param spatial.ac A value between 0 and 1 giving the cross-sectional (spatial) 
@@ -179,32 +182,95 @@ gen_errormat <- function(data, time.ac, spatial.ac){
 #' 
 #' @export
 tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1, 
-                      cross.int.mean = 0, cross.int.sd = 1, cross.eff.mean = 3, 
-                      cross.eff.sd = .5, case.eff.mean = -3, case.eff.sd = .5, noise.sd = 1, 
+                      cross.int.mean = 0, cross.int.sd = 1, cross.eff.mean = 0, 
+                      cross.eff.sd = .5, case.eff.mean = 0.5, case.eff.sd = .5, noise.sd = 1, 
                       omm.x.case = 0, omm.x.cross = 0, omm.y.case = 0, omm.y.cross = 0, 
-                      binary = FALSE, unbalance = FALSE, time.ac = 0, spatial.ac = 0){
+                      treat_effect = FALSE, 
+                    binary_outcome=FALSE,unbalance = FALSE, 
+                    gsynth=FALSE,
+                    prop_treated_gsynth=0.5,time.ac = 0, spatial.ac = 0){
+      
+      # if treatment effects are used, need to exclude negative numbers
   
-
-      bet.data <- data.frame(case=1:N, 
-                             alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd), 
-                             gamma=ifelse(case.eff.sd>0,rnorm(N, mean=case.eff.mean, sd=case.eff.sd),
-                                           case.eff.mean),
-                             zi=rnorm(N), 
-                             unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
-                             one=1)
-      with.data <- data.frame(time=1:T, 
-                              alpha.t=rnorm(T, mean=cross.int.mean, sd=cross.int.sd), 
-                              beta=ifelse(cross.eff.sd>0,rnorm(T, mean=cross.eff.mean, sd=cross.eff.sd), 
-                                          cross.eff.mean),
-                              zt=rnorm(T), 
-                              one=1)
+      if(treat_effect || binary_outcome) {
+        if(case.eff.mean>.9999 || cross.eff.mean>.9999 || omm.x.cross>.9999 ||
+           omm.y.cross>.9999 || omm.x.case>.9999 || omm.y.case>.9999) {
+          stop("You specified a value for a treatment/omitted variable that is greater than .9999 (i.e. not a probability).\n
+               Change treat_effect to false to calculate on all real numbers instead of probabilities.")
+        } 
+        
+        case.eff.mean <- suppressWarnings(qlogis(case.eff.mean+0.5))
+        cross.eff.mean <- suppressWarnings(qlogis(cross.eff.mean+0.5))
+        omm.x.cross <- suppressWarnings(qlogis(omm.x.cross+0.5))
+        omm.x.case <- suppressWarnings(qlogis(omm.x.case+0.5))
+        omm.y.case <- suppressWarnings(qlogis(omm.y.case+0.5))
+        omm.y.cross <- suppressWarnings(qlogis(omm.y.cross+0.5))
+        
+        # case.eff.mean <- qlogis(case.eff.mean)
+        # cross.eff.mean <- qlogis(cross.eff.mean)
+        # omm.x.cross <- qlogis(omm.x.cross)
+        # omm.x.case <- qlogis(omm.x.case)
+        # omm.y.case <- qlogis(omm.y.case)
+        # omm.y.cross <- qlogis(omm.y.cross)
+        
+      }
+  
+      # we need different data if we are going to simulate gsynth
+  
+      if(gsynth) {
+        
+        print("Note: changing data distribution to reflect assumptions of gsynth estimator (only one transition from control to treatment.)")
+        control_period <- round(T*prop_treated_gsynth)
+        
+        bet.data <- data.frame(case=1:N, 
+                               alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd), 
+                               gamma=ifelse(case.eff.sd>0,rnorm(N, mean=case.eff.mean, sd=case.eff.sd),
+                                            case.eff.mean),
+                               zi=rnorm(N), 
+                               unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
+                               one=1)
+        # make sure control group has X=0
+        with.data_cont <- data.frame(time=1:control_period, 
+                                alpha.t=rnorm(control_period, mean=cross.int.mean, sd=cross.int.sd), 
+                                beta=-Inf,
+                                zt=rnorm(control_period), 
+                                one=1)
+        with.data_between <- data.frame(time=(control_period+1):T, 
+                                     alpha.t=rnorm(length((control_period+1):T), mean=cross.int.mean, sd=cross.int.sd), 
+                                     beta=ifelse(cross.eff.sd>0,rnorm(length((control_period+1):T), mean=cross.eff.mean, sd=cross.eff.sd), 
+                                                 cross.eff.mean),
+                                     zt=rnorm(length((control_period+1):T)), 
+                                     one=1)
+        
+        with.data <- bind_rows(with.data_cont,with.data_between)
+        
+      } else {
+        bet.data <- data.frame(case=1:N, 
+                               alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd), 
+                               gamma=ifelse(case.eff.sd>0,rnorm(N, mean=case.eff.mean, sd=case.eff.sd),
+                                            case.eff.mean),
+                               zi=rnorm(N), 
+                               unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
+                               one=1)
+        with.data <- data.frame(time=1:T, 
+                                alpha.t=rnorm(T, mean=cross.int.mean, sd=cross.int.sd), 
+                                beta=ifelse(cross.eff.sd>0,rnorm(T, mean=cross.eff.mean, sd=cross.eff.sd), 
+                                            cross.eff.mean),
+                                zt=rnorm(T), 
+                                one=1)
+      }
+  
+        
+      
       data <- full_join(bet.data, with.data, by="one")
+
+      
       if(time.ac==0 && spatial.ac==0) {
         # if no autocorrelation, much faster to just use rnorm
         data <- data %>%
               mutate(noise=rnorm(n=N*T,sd=noise.sd),
-                     x=(alpha.i-alpha.t)/(beta - gamma) + omm.x.case*zi + omm.x.cross*zt, 
-                     y=(beta*alpha.i-gamma*alpha.t)/(beta - gamma) + omm.y.case*zi + omm.y.cross*zt + noise,
+                     x=det_outcome((alpha.i-alpha.t)/(beta - gamma) + omm.x.case*zi + omm.x.cross*zt,treat_effect=treat_effect,x=T), 
+                     y=det_outcome((ifelse(is.infinite(beta),0,beta)*alpha.i-gamma*alpha.t)/(beta - gamma) + omm.y.case*zi + omm.y.cross*zt + noise,treat_effect=binary_outcome,x=F),
                      tokeep = time <= unbal) %>%
               dplyr::select(case, time, y, x, gamma, beta, alpha.i, alpha.t, noise, 
                             zi, zt, tokeep) %>%
@@ -213,20 +279,22 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
         eps <- gen_errormat(data, time.ac, spatial.ac)
         data <- data %>%
           mutate(noise=mvrnorm(n=1, mu=rep(0, N*T), Sigma=eps)*noise.sd,
-                 x=(alpha.i-alpha.t)/(beta - gamma) + omm.x.case*zi + omm.x.cross*zt, 
-                 y=(beta*alpha.i-gamma*alpha.t)/(beta - gamma) + omm.y.case*zi + omm.y.cross*zt + noise,
+                 x=det_outcome((alpha.i-alpha.t)/(beta - gamma) + omm.x.case*zi + omm.x.cross*zt,treat_effect=treat_effect,x=T),
+                 y=det_outcome((beta*alpha.i-gamma*alpha.t)/(beta - gamma) + omm.y.case*zi + omm.y.cross*zt + noise,treat_effect=binary_outcome,x=F),
                  tokeep = time <= unbal) %>%
           dplyr::select(case, time, y, x, gamma, beta, alpha.i, alpha.t, noise, 
                         zi, zt, tokeep) %>%
           arrange(case, time)
       }
-      if(binary) data <- mutate(data, x=(x>=median(x)))
+      #if(binary) data <- mutate(data, x=(x>=median(x)))
       
       pars <- data.frame(N = N, T = T, case.int.mean = case.int.mean, case.int.sd = case.int.sd, 
                       cross.int.mean = cross.int.mean, cross.int.sd = cross.int.sd, cross.eff.mean = cross.eff.mean, 
                       cross.eff.sd = cross.eff.sd, case.eff.mean = case.eff.mean, case.eff.sd = case.eff.sd, noise.sd = noise.sd, 
                       omm.x.case = omm.x.case, omm.x.cross = omm.x.cross, omm.y.case = omm.y.case, omm.y.cross = omm.y.cross, 
-                      binary = binary, unbalance = unbalance, time.ac = time.ac, spatial.ac = spatial.ac)
+                      treat_effect = treat_effect,
+                      binary_outcome=binary_outcome,
+                      unbalance = unbalance, time.ac = time.ac, spatial.ac = spatial.ac)
       toreturn <- list(data, pars)
       names(toreturn) <- c("data", "pars")
       return(toreturn)
@@ -284,7 +352,7 @@ tw_reg <- function(d){
 #' 
 #' @param gendata A data frame of simulated panel data procued by 
 #' \code{\link{tw_data}}
-#' @param randomfx Whether to include random effects estimates in the
+#' @param models Whether to include random effects estimates in the
 #' returned data frame (defaults to true).
 #' 
 #' @return The function returns a \code{data.frame} with the coefficients
@@ -303,26 +371,32 @@ tw_reg <- function(d){
 #' @import gsynth
 #' @import wfe
 #' @export
-tw_model <- function(gendata, models=c("randomfx","wfe","gsynth")){
-  
-  
+tw_model <- function(gendata, models=c("randomfx","wfe"),binary_outcome=FALSE){
+
       data <- gendata$data
       pars <- gendata$pars
-      
+
       pdata <- data[,apply(data, 2, sd)!=0]
       pdata <- select(pdata,time_id="time",everything())
       pdata.time <- pdata.frame(as.data.frame(pdata), index=c("case","time_id"), row.names=FALSE,drop.index = T)
       pdata.xs <- pdata.frame(as.data.frame(pdata), index=c("time_id","case"), row.names=FALSE,drop.index = T)
       
       # need to add binary x for wfe/gsynth
-      pdata$bin_x <- as.numeric(pdata$x>median(pdata$x))
+      if(!(all(pdata$x %in% c(0,1)))) {
+        pdata$bin_x <- as.numeric(pdata$x>median(pdata$x))
+      } else {
+        pdata$bin_x <- pdata$x
+      }
+      
       #1) Pooled OLS
       pooled.ols <- lm(y ~ x, data=data)
       
       #2) One way FEs
-      browser()
+
       case.fe.plm <- plm(y ~ x, model="within", data=pdata.time)
       time.fe.plm <- plm(y ~ x, model="within", data=pdata.xs)
+      
+
       
       #3) Random effects
       if("randomfx" %in% models) {
@@ -345,22 +419,38 @@ tw_model <- function(gendata, models=c("randomfx","wfe","gsynth")){
       twse <- summary(twoway.fe)$coefficients[2,2]
       tw_pval <- summary(twoway.fe)$coefficients[2,4]
       
+      # 5) Generalized Synthetic Control
+      
       if("gsynth" %in% models) {
         
-        gsynth_out <- try(suppressMessages(gsynth(formula = y~bin_x,index=c("case","time_id"),data=pdata,se=T)))
+        gsynth_out <- try(suppressMessages(gsynth(formula = y~bin_x,index=c("case","time_id"),
+                                                  EM=T,
+                                                  inference="parametric",
+                                                  parallel=F,
+                                                  data=pdata,se=T)))
         
         if(!('try-error' %in% class(gsynth_out))) {
           coef_gsynth <- gsynth_out$est.avg[,"ATT.avg"]
           p_gsynth <- gsynth_out$est.avg[,"p.value"]
           se_gsynth <- gsynth_out$est.avg[,"S.E."]
+          r_gsynth <- gsynth_out$r.cv
         } else {
           print(paste("R package gsynth failed to estimate because of ",gsynth_out))
           coef_gsynth <- NA
           p_gsynth <- NA
           se_gsynth <- NA
+          r_gsynth <- NA
         }
         
+        
+      } else {
+        coef_gsynth <- NA
+        p_gsynth <- NA
+        se_gsynth <- NA
+        r_gsynth <- NA
       }
+      
+      # 6) Weighted Fixed Effects
       
       if("wfe" %in% models) {
         wfe_out <- try(suppressMessages(wfe(y~bin_x,data=pdata,treat="bin_x",unit.index="case",time.index="time_id")))
@@ -376,14 +466,70 @@ tw_model <- function(gendata, models=c("randomfx","wfe","gsynth")){
           p_wfe <- NA
           se_wfe <- NA
         }
+        coef_wfe <- NA
+        p_wfe <- NA
+        se_wfe <- NA
         
-        
+      } else {
+        coef_wfe <- NA
+        p_wfe <- NA
+        se_wfe <- NA
       }
       
+      # 7) Logit GLM (if binary_outcome)
+      
+      if(binary_outcome) {
+        bin_out_case <- try(suppressMessages(glm(y~x + factor(case),family="binomial",data=pdata)))
+        bin_out_time <- try(suppressMessages(glm(y~x + factor(time_id),family="binomial",data=pdata)))
+        bin_out_twoway <- try(suppressMessages(glm(y~x + factor(time_id) + factor(case),family="binomial",data=pdata)))
+        
+        if(!('try-error') %in% bin_out_case) {
+          bin_out_case_coef <- summary(bin_out_case)$coefficients[2,1]
+          bin_out_case_se <- summary(bin_out_case)$coefficients[2,2]
+          bin_out_case_pval <- summary(bin_out_case)$coefficients[2,4]
+        } else {
+          bin_out_case_coef <- NA
+          bin_out_case_se <- NA
+          bin_out_case_pval <- NA
+        }
+        
+        if(!('try-error') %in% bin_out_time) {
+          bin_out_time_coef <- summary(bin_out_time)$coefficients[2,1]
+          bin_out_time_se <- summary(bin_out_time)$coefficients[2,2]
+          bin_out_time_pval <- summary(bin_out_time)$coefficients[2,4]
+        } else {
+          bin_out_time_coef <- NA
+          bin_out_time_se <- NA
+          bin_out_time_pval <- NA
+        }
+        
+        if(!('try-error') %in% bin_out_twoway) {
+          bin_out_twoway_coef <- summary(bin_out_twoway)$coefficients[2,1]
+          bin_out_twoway_se <- summary(bin_out_twoway)$coefficients[2,2]
+          bin_out_twoway_pval <- summary(bin_out_twoway)$coefficients[2,4]
+        } else {
+          bin_out_twoway_coef <- NA
+          bin_out_twoway_se <- NA
+          bin_out_twoway_pval <- NA
+        }
+        
+      } else {
+        bin_out_case_coef <- NA
+        bin_out_case_se <- NA
+        bin_out_case_pval <- NA
+        bin_out_time_coef <- NA
+        bin_out_time_se <- NA
+        bin_out_time_pval <- NA
+        bin_out_twoway_coef <- NA
+        bin_out_twoway_se <- NA
+        bin_out_twoway_pval <- NA
+      }
+
       ### Compile saved results in a data frame  
       results <- tibble(
             model = c("Two-way FE", "Case FE", "Time FE", "Pooled OLS",
-                      "RE (u_i)","RE (v_t)","Generalized\nSynthetic\nControl","Weighted\nFixed Effects"),
+                      "RE (u_i)","RE (v_t)","Generalized\nSynthetic\nControl","Weighted\nFixed Effects",
+                      "Case Logit","Time Logit","Two-way Logit"),
             coef = c(twcoef,
                      #summary(case.fe.dummy)$coefficients[2,1],
                      summary(case.fe.plm)$coefficients[1,1],
@@ -393,7 +539,10 @@ tw_model <- function(gendata, models=c("randomfx","wfe","gsynth")){
                      random_time_coef,
                      random_xs_coef,
                      coef_gsynth,
-                     coef_wfe),
+                     coef_wfe,
+                     bin_out_case_coef,
+                     bin_out_time_coef,
+                     bin_out_twoway_coef),
             se = c(twse,
                   # summary(case.fe.dummy)$coefficients[2,2],
                    summary(case.fe.plm)$coefficients[1,2],
@@ -403,7 +552,10 @@ tw_model <- function(gendata, models=c("randomfx","wfe","gsynth")){
                   random_time_se,
                   random_xs_se,
                   se_gsynth,
-                  se_wfe),
+                  se_wfe,
+                  bin_out_case_se,
+                  bin_out_time_se,
+                  bin_out_twoway_se),
             p_val = c(tw_pval,
                       summary(case.fe.plm)$coefficients[1,4],
                       #summary(time.fe.dummy)$coefficients[2,2],
@@ -412,8 +564,12 @@ tw_model <- function(gendata, models=c("randomfx","wfe","gsynth")){
                       random_time_pval,
                       random_xs_pval,
                       p_gsynth,
-                      p_wfe),
-            tw_id=identified
+                      p_wfe,
+                      bin_out_case_pval,
+                      bin_out_time_pval,
+                      bin_out_twoway_pval),
+            tw_id=identified,
+            gsynth_factor=r_gsynth
       )
 
       return(results)
@@ -515,21 +671,38 @@ twtrans2 <- function(data){
 #' @importFrom plm plm pdata.frame
 #' @export
 tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
-                   at1=seq(-1,1,by = .1), 
-                   at2=NULL, models=c("randomfx","wfe","gsynth"), ...){
+                   range1=c(-1,1), 
+                   range2=NULL, models=c("randomfx","wfe"), ...){
       
 
+      # sample from uniform bounds 
   
-      if(is.null(at2)) {
-        el <- expand.grid(iteration = 1:iter, input1 = at1, arg=arg)
+      range1 <- runif(iter,min=range1[1],max=range1[2])
+      
+      if(!is.null(range2)) range2 <- runif(iter,min=range2[1],max=range2[2])
+  
+  
+      if(is.null(range2)) {
+        el <- expand.grid(iteration = 1:iter, input1 = range1, arg=arg)
         # split to help with parallel processing
         split_el <- split(el,list(el$input,el$iteration))
       } else {
-        el <- expand.grid(iteration = 1:iter, input1 = at1, input2=at2,arg=arg)
+        el <- expand.grid(iteration = 1:iter, input1 = range1, input2=range2,arg=arg)
         # split to help with parallel processing
         split_el <- split(el,list(el$input1,el$input2,el$iteration))
       }
       
+      # check for binary outcomes
+      
+      check_args <- list(...)
+      
+      if(!is.null(check_args$binary_outcome) &&
+                  check_args$binary_outcome==101) {
+        binary_outcome <- T
+      } else {
+        binary_outcome <- F
+      }
+       
       
       if(parallel){
             #if(file.exists('output.txt')) file.remove('output.txt')
@@ -551,9 +724,9 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
                   } else {
                     z<-c(z,extra.args)
                   }
-                  
+                  #z$gsynth <- "gsynth" %in% models
                   d <- do.call(tw_data, args=z)
-                  m <- tw_model(d, models=models)
+                  m <- tw_model(d, models=models,binary_outcome=binary_outcome)
                   m$iteration <- el$iteration
                   
                   out <- data_frame(input1=unique(el$input1),
@@ -576,7 +749,7 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
           print(paste0('Now on iteration ',el$iteration[1], ' of input ',
                        el$input1[1], ' for parameter ',el$arg[1],collapse=" "))
 
-          
+
           z <- list(foo = el$input1[1])
           names(z) <- el$arg[1]
           extra.args <- as.list(substitute(list(...)))[-1L]
@@ -588,8 +761,10 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
             z<-c(z,extra.args)
           }
           
+          #z$gsynth <- "gsynth" %in% models
+          
           d <- do.call(tw_data, args=z)
-          m <- tw_model(d, models=models)
+          m <- tw_model(d, models=models,binary_outcome=binary_outcome)
           m$iteration <- el$iteration
           
           out <- data_frame(input1=unique(el$input1),
@@ -628,6 +803,10 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
 #' attribute should be on the y axis? See \code{\link{tw_data}} for possible
 #' attribute names. Should be an unquoted variable name like 
 #' \code{case.int.sd}.
+#' @param facet_scales The value of \code{scales} option passed to the 
+#' \code{ggplot2} \code{facet_wrap} function to control the scales. 
+#' Changes to \code{'free_x'},\code{'free_y'} or \code{'free'} if the 
+#' scales obscure comparison
 #' @param ... Currently ignored
 #' 
 #' @import ggplot2
@@ -637,10 +816,11 @@ tw_plot <- function(gensim,
                     use_ci=T,
                     xvar=NULL,
                     yvar=NULL,
+                    facet_scales="fixed",
                     ...) {
 
   
-  att_data <- select(gensim,-iteration,-model,-coef,-se)
+  att_data <- select(gensim,-iteration,-model,-coef,-se,-p_val,-tw_id,-gsynth_factor)
   att_names <- names(att_data)
   
   
@@ -653,13 +833,13 @@ tw_plot <- function(gensim,
         ggplot(aes(y=!! sym(att_names[1]),
                     x=!! sym(att_names[2]))) + 
           geom_raster(aes(fill=!! sym(display_est))) + 
-          facet_wrap(~model)
+          facet_wrap(~model,scales=facet_scales)
     } else {
       gensim %>% 
         ggplot(aes_(y=!! enquo(yvar),
                     x=!! enquo(xvar))) + 
         geom_raster(aes(fill=coef)) + 
-        facet_wrap(~model)
+        facet_wrap(~model,scales=facet_scales)
     }
   } else {
     
@@ -673,7 +853,7 @@ tw_plot <- function(gensim,
             strip.text = element_text(face="bold")) +
       ylab("Estimated Coefficient") +
       xlab(paste0("Fixed Value for ",att_names)) +
-      facet_wrap(~model)
+      facet_wrap(~model,scales=facet_scales)
   }
   
 }
@@ -681,6 +861,17 @@ tw_plot <- function(gensim,
 #' Would like to have a function that can generate power curves
 tw_power <- function(gensim,
                      ...) {
-  
+
+}
+
+#' Function to determine whether to sample from binary outcome or the real line
+det_outcome <- function(var,treat_effect=NULL,x=NULL) {
+  if(treat_effect && x) {
+    as.numeric(var>median(var))
+  } else if(treat_effect && !x) {
+    as.numeric(runif(length(var))<plogis(var))
+  } else {
+    var
+  }
 }
 
