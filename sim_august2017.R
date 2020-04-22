@@ -1,6 +1,8 @@
 library(tidyverse)
-setwd("~/Box Sync/Between Effects/Simulation")
+#setwd("~/Box Sync/Between Effects/Simulation")
 source("twsim.R")
+
+require(parallel)
 
 set.seed(22902)
 
