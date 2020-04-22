@@ -10,6 +10,7 @@ tw_plot(
   use_ci = T,
   xvar = NULL,
   yvar = NULL,
+  facet_scales = "fixed",
   ...
 )
 }
@@ -17,7 +18,7 @@ tw_plot(
 \item{gensim}{A set of simulations produced by \code{\link{tw_sim}}}
 
 \item{display_est}{Whether to display estimated coefficients of 
-independent variables from the linear model (\code("coef")) or the
+independent variables from the linear model (\code{"coef"}) or the
 standard error of these estimates (\code{"se"})}
 
 \item{use_ci}{Whether to add confidence intervals around LOESS curves.
@@ -32,6 +33,11 @@ attribute names. Should be an unquoted variable name like
 attribute should be on the y axis? See \code{\link{tw_data}} for possible
 attribute names. Should be an unquoted variable name like 
 \code{case.int.sd}.}
+
+\item{facet_scales}{The value of \code{scales} option passed to the 
+\code{ggplot2} \code{facet_wrap} function to control the scales. 
+Changes to \code{'free_x'},\code{'free_y'} or \code{'free'} if the 
+scales obscure comparison}
 
 \item{...}{Currently ignored}
 }

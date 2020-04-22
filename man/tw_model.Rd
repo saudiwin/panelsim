@@ -4,13 +4,13 @@
 \alias{tw_model}
 \title{Fit Panel Data Given Simulated Data}
 \usage{
-tw_model(gendata, models = c("randomfx", "wfe", "gsynth"))
+tw_model(gendata, models = c("randomfx", "wfe"), binary_outcome = FALSE)
 }
 \arguments{
 \item{gendata}{A data frame of simulated panel data procued by 
 \code{\link{tw_data}}}
 
-\item{randomfx}{Whether to include random effects estimates in the
+\item{models}{Whether to include random effects estimates in the
 returned data frame (defaults to true).}
 }
 \value{

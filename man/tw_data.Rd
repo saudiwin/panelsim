@@ -11,17 +11,20 @@ tw_data(
   case.int.sd = 1,
   cross.int.mean = 0,
   cross.int.sd = 1,
-  cross.eff.mean = 3,
+  cross.eff.mean = 0,
   cross.eff.sd = 0.5,
-  case.eff.mean = -3,
+  case.eff.mean = 0.5,
   case.eff.sd = 0.5,
   noise.sd = 1,
   omm.x.case = 0,
   omm.x.cross = 0,
   omm.y.case = 0,
   omm.y.cross = 0,
-  binary = FALSE,
+  treat_effect = FALSE,
+  binary_outcome = FALSE,
   unbalance = FALSE,
+  gsynth = FALSE,
+  prop_treated_gsynth = 0.5,
   time.ac = 0,
   spatial.ac = 0
 )
@@ -57,7 +60,9 @@ tw_data(
 
 \item{omm.y.cross}{The value of an omitted variable correlated with Y that varies cross-sectionally}
 
-\item{binary}{Whether to generate a continuous outcome/DV or a binary outcome/DV}
+\item{treat_effect}{Whether to generate an X variable that is 0/1 (dichotomous treatment). If so,
+all effects (case/time/omitted) should be strictly between \code{[0,.9999]} as they will 
+be interpreted as probabilities.}
 
 \item{unbalance}{Whether to simulate varying numbers of observations by cases or time points.}
 
@@ -65,6 +70,8 @@ tw_data(
 
 \item{spatial.ac}{A value between 0 and 1 giving the cross-sectional (spatial) 
 autocorrelation in the effect of X on Y}
+
+\item{bin_outcome}{Whether the Y (outcome) variable should also be simulated as a binary 0/1 variable.}
 }
 \value{
 The function returns a named list where \code{object$data} is a \code{data.frame} and 

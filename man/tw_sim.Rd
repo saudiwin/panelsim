@@ -9,9 +9,9 @@ tw_sim(
   cores = 1,
   parallel = FALSE,
   arg = "cross.eff.mean",
-  at1 = seq(-1, 1, by = 0.1),
-  at2 = NULL,
-  models = c("randomfx", "wfe", "gsynth"),
+  range1 = c(-1, 1),
+  range2 = NULL,
+  models = c("randomfx", "wfe"),
   ...
 )
 }
