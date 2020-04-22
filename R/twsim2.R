@@ -191,6 +191,21 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
                     prop_treated_gsynth=0.5,time.ac = 0, spatial.ac = 0){
       
       # if treatment effects are used, need to exclude negative numbers
+  if(case.eff.sd>0) {
+    gamma <- rnorm(N, mean=case.eff.mean, sd=case.eff.sd)
+  } else {
+    gamma <- case.eff.mean
+  }
+  
+  if(cross.eff.sd>0) {
+    beta <- rnorm(T, mean=cross.eff.mean, sd=cross.eff.sd)
+  } else {
+    beta <- cross.eff.mean
+  }
+  
+  ifelse(cross.eff.sd>0,, 
+         cross.eff.mean)
+
   
       if(treat_effect || binary_outcome) {
         if(case.eff.mean>.9999 || cross.eff.mean>.9999 || omm.x.cross>.9999 ||
@@ -224,8 +239,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
         
         bet.data <- data.frame(case=1:N, 
                                alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd), 
-                               gamma=ifelse(case.eff.sd>0,rnorm(N, mean=case.eff.mean, sd=case.eff.sd),
-                                            case.eff.mean),
+                               gamma=gamma,
                                zi=rnorm(N), 
                                unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
                                one=1)
@@ -237,8 +251,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
                                 one=1)
         with.data_between <- data.frame(time=(control_period+1):T, 
                                      alpha.t=rnorm(length((control_period+1):T), mean=cross.int.mean, sd=cross.int.sd), 
-                                     beta=ifelse(cross.eff.sd>0,rnorm(length((control_period+1):T), mean=cross.eff.mean, sd=cross.eff.sd), 
-                                                 cross.eff.mean),
+                                     beta=beta,
                                      zt=rnorm(length((control_period+1):T)), 
                                      one=1)
         
@@ -247,15 +260,13 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
       } else {
         bet.data <- data.frame(case=1:N, 
                                alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd), 
-                               gamma=ifelse(case.eff.sd>0,rnorm(N, mean=case.eff.mean, sd=case.eff.sd),
-                                            case.eff.mean),
+                               gamma=gamma,
                                zi=rnorm(N), 
                                unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
                                one=1)
         with.data <- data.frame(time=1:T, 
                                 alpha.t=rnorm(T, mean=cross.int.mean, sd=cross.int.sd), 
-                                beta=ifelse(cross.eff.sd>0,rnorm(T, mean=cross.eff.mean, sd=cross.eff.sd), 
-                                            cross.eff.mean),
+                                beta=beta,
                                 zt=rnorm(T), 
                                 one=1)
       }
