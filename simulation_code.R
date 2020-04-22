@@ -3,6 +3,9 @@ library(panelsim)
 #setwd("~/Box Sync/Between Effects/Simulation")
 #source("tw_sim.R")
 
+# to run code, first install R package from Github
+# remotes::install_github("saudiwin/panelsim")
+
 set.seed(22902)
 
 ## Changing the mean of the within-time slopes

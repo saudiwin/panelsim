@@ -791,7 +791,7 @@ tw_sim <- function(iter=1000, cores=1, parallel=FALSE, arg='cross.eff.mean',
 #' 
 #' @param gensim A set of simulations produced by \code{\link{tw_sim}}
 #' @param display_est Whether to display estimated coefficients of 
-#' independent variables from the linear model (\code("coef")) or the
+#' independent variables from the linear model (\code{"coef"}) or the
 #' standard error of these estimates (\code{"se"})
 #' @param use_ci Whether to add confidence intervals around LOESS curves.
 #' Turn off if the CIs are too big relative to plot.
