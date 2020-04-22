@@ -203,9 +203,6 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
     beta <- cross.eff.mean
   }
   
-  ifelse(cross.eff.sd>0,, 
-         cross.eff.mean)
-
   
       if(treat_effect || binary_outcome) {
         if(case.eff.mean>.9999 || cross.eff.mean>.9999 || omm.x.cross>.9999 ||
