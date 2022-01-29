@@ -1,10 +1,10 @@
 library(tidyr)
+
+# to run code, first install panelsim R package from Github by using: remotes::install_github("saudiwin/panelsim")
 library(panelsim)
+
 #setwd("~/Box Sync/Between Effects/Simulation")
 #source("tw_sim.R")
-
-# to run code, first install R package from Github
-# remotes::install_github("saudiwin/panelsim")
 
 set.seed(22902)
 
