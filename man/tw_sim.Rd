@@ -26,26 +26,26 @@ tw_sim(
 
 \item{models}{A list of additional models besides fixed effects models to fit to the data.}
 
-\item{...}{All additional parameters to pass on to \code{link{tw_data}}, such as 
+\item{...}{All additional parameters to pass on to \code{link{tw_data}}, such as
 average effects in case or cross-sectional dimensions of the data.}
 
 \item{at}{A numeric sequence giving the range of values of the \code{arg} parameter to vary across.}
 }
 \value{
-This function returns a \code{data.frame} with the two-way fixed effects coefficient, 
+This function returns a \code{data.frame} with the two-way fixed effects coefficient,
 both case (over-time) and cross-sectional 1-way fixed effects estimates, pooled OLS model
 estimates, and a random-effects estimate. Each row of the \code{data.frame} represents
-one sample of panel data drawn from \code{link{tw_data}}. This data can then be plotted with the 
+one sample of panel data drawn from \code{link{tw_data}}. This data can then be plotted with the
 \code{\link{tw_plot}} function to see results of the simulation.
 }
 \description{
 Use this function to run your own Monte Carlo experiments on panel data.
 }
 \details{
-The \code{tw_sim} function acts as a frontend to the \code{link{tw_data}} function that 
-generates panel data given a set of parameters. The arguments are fairly self-explanatory, and 
+The \code{tw_sim} function acts as a frontend to the \code{link{tw_data}} function that
+generates panel data given a set of parameters. The arguments are fairly self-explanatory, and
 any underlying panel data parameters are passed on to \code{link{tw_data}}, so review that help
-site for more information. The simulation works by passing a character value of one of the 
+site for more information. The simulation works by passing a character value of one of the
 parameters from the \code{link{tw_data}} function to the \code{arg} option, such as \code{cross.eff.mean}
 for varying cross-sectional effects. The \code{at} option must take a numeric vector giving the range of
 values to iterate over, such as \code{seq(-1,1,by=.1)} to test values of \code{cross.eff.mean} from

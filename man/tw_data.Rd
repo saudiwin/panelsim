@@ -12,6 +12,10 @@ tw_data(
   cross.int.mean = 0,
   cross.int.sd = 1,
   cross.eff.mean = 0,
+  did.eff.mean = 0,
+  did.eff.sd = 0,
+  wid.eff.mean = 0,
+  wid.eff.sd = 0,
   cross.eff.sd = 0.5,
   case.eff.mean = 0.5,
   case.eff.sd = 0.5,
@@ -44,6 +48,14 @@ tw_data(
 
 \item{cross.eff.mean}{The mean of the cross-sectional effect of X on Y}
 
+\item{did.eff.mean}{The mean of the difference-in-difference effect of X on Y}
+
+\item{did.eff.sd}{The SD of the difference-in-difference effect of X on Y}
+
+\item{wid.eff.mean}{The mean of the difference-in-cases effect of X on Y}
+
+\item{wid.eff.sd}{The SD of the difference-in-cases effect of X on Y}
+
 \item{cross.eff.sd}{The SD of the cross-sectional effect of X on Y}
 
 \item{case.eff.mean}{The mean of the case (over-time) effect of X on Y}
@@ -61,60 +73,60 @@ tw_data(
 \item{omm.y.cross}{The value of an omitted variable correlated with Y that varies cross-sectionally}
 
 \item{treat_effect}{Whether to generate an X variable that is 0/1 (dichotomous treatment). If so,
-all effects (case/time/omitted) should be strictly between \code{[0,.9999]} as they will 
+all effects (case/time/omitted) should be strictly between \code{[0,.9999]} as they will
 be interpreted as probabilities.}
 
 \item{unbalance}{Whether to simulate varying numbers of observations by cases or time points.}
 
 \item{time.ac}{A value between 0 and 1 giving the over-time autocorrelation in effect of X on Y}
 
-\item{spatial.ac}{A value between 0 and 1 giving the cross-sectional (spatial) 
+\item{spatial.ac}{A value between 0 and 1 giving the cross-sectional (spatial)
 autocorrelation in the effect of X on Y}
 
 \item{bin_outcome}{Whether the Y (outcome) variable should also be simulated as a binary 0/1 variable.}
 }
 \value{
-The function returns a named list where \code{object$data} is a \code{data.frame} and 
+The function returns a named list where \code{object$data} is a \code{data.frame} and
 \code{object$pars} are the original parametes used to generate the data.
 }
 \description{
-This function will produce panel data where variation can exist in the cross-section, over time 
+This function will produce panel data where variation can exist in the cross-section, over time
 or in both dimensions simultaneously. Furthermore, effect heterogeneity by case or cross section
 is also allowed.
 }
 \details{
-The \code{tw_data} function is the workhorse of the \code{twowaysim} package. It accepts as 
-input the dimensions of the panel/TSCS data to be generated, and also parameters that 
-determine the extent of variance and heterogeneity in either the cross-sectional or 
+The \code{tw_data} function is the workhorse of the \code{twowaysim} package. It accepts as
+input the dimensions of the panel/TSCS data to be generated, and also parameters that
+determine the extent of variance and heterogeneity in either the cross-sectional or
 over-time effects in the data. The parameter \code{N} determines how many observations
-exist for each case or unit in the panel, while \code{T} determines how many time points exist 
+exist for each case or unit in the panel, while \code{T} determines how many time points exist
 per case or unit. To create a model with a within-unit over-time (case) effect,
-simply set \code{case.eff.mean} to a non-zero number and set \code{case.eff.sd} to zero. Similarly, 
-setting \code{cross.eff.mean} to a non-zero number and \code{cross.eff.sd} to zero will produce a 
+simply set \code{case.eff.mean} to a non-zero number and set \code{case.eff.sd} to zero. Similarly,
+setting \code{cross.eff.mean} to a non-zero number and \code{cross.eff.sd} to zero will produce a
 panel dataset with a cross-sectional effect of X on Y where the effect of X does not vary across
 countries (no effect heterogeneity). Increasing \code{cross.eff.sd} and \code{case.eff.sd} will result in more
 effect heterogeneity across countries and time points. If both \code{case.eff.mean} and \code{cross.eff.mean} are
-non-zero, then Y will have both dimensions of variance. A 1-way fixed effects model with intercepts on 
+non-zero, then Y will have both dimensions of variance. A 1-way fixed effects model with intercepts on
 cases will return the \code{case.eff.mean} coefficient and a model with intercepts on time points will return
-the \code{cross.eff.mean} estimate, whereas a 2-way model (intercepts on cases and time points) will return 
-a difficult-to-characterize weighted average. 
+the \code{cross.eff.mean} estimate, whereas a 2-way model (intercepts on cases and time points) will return
+a difficult-to-characterize weighted average.
 
 We refer you to Kropko and Kubinec (2018) for more information
-on the difference between these models: 
-\url{https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3062619}. 
+on the difference between these models:
+\url{https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3062619}.
 
 The parameters \code{case.int} and \code{cross.int} represent the values of the intercepts for the
 cases or time points. Changing these parameters will increase or decrease the amount of unexplained
 variance (random noise) in the dataset.
 
 The additional parameters in the function allow the user to create unbalanced panels (varying numbers
-of observations per case or time point if \code{unbalance=TRUE}), auto-correlation in the effects and 
-omitted variables. Autocorrelation can exist either in the over time dimension or the cross-sectional 
+of observations per case or time point if \code{unbalance=TRUE}), auto-correlation in the effects and
+omitted variables. Autocorrelation can exist either in the over time dimension or the cross-sectional
 dimension. To increase time autocorrelation, set \code{time.ac} to a value between 0 and 1 where values
-closer to one signal higher autocorrelation. To increase spatial (cross-sectional) autocorrelation, 
-set \code{spatial.ac} to a value between 0 and 1. 
+closer to one signal higher autocorrelation. To increase spatial (cross-sectional) autocorrelation,
+set \code{spatial.ac} to a value between 0 and 1.
 
-Finally, to include omitted variables, set one of the \code{omm} parameters to a non-zero value. 
+Finally, to include omitted variables, set one of the \code{omm} parameters to a non-zero value.
 Omitted variables that vary within cases (over time) can be included by setting an \code{omm} parameter
 subscripted with \code{case} to a non-zero value, and the same is possible for variables that vary
 in the cross-section \code{cross}. The analyst can also decide whether the omitted variable is correlated
@@ -146,6 +158,6 @@ both_case_cross <- tw_data(cross.eff.mean=3,
 
 }
 \seealso{
-\code{\link{tw_model}} for running linear models on the data and and 
+\code{\link{tw_model}} for running linear models on the data and and
 \code{\link{tw_sim}} function for running Monte Carlo simulations on panel data.
 }

@@ -165,6 +165,10 @@ gen_errormat <- function(data, time.ac, spatial.ac){
 #' @param cross.eff.sd The SD of the cross-sectional effect of X on Y
 #' @param case.eff.mean The mean of the case (over-time) effect of X on Y
 #' @param case.eff.sd The SD of the case (over-time) effect of X on Y
+#' @param did.eff.mean The mean of the difference-in-difference effect of X on Y
+#' @param did.eff.sd The SD of the difference-in-difference effect of X on Y
+#' @param wid.eff.mean The mean of the difference-in-cases effect of X on Y
+#' @param wid.eff.sd The SD of the difference-in-cases effect of X on Y
 #' @param noise.sd The residual variance of the data
 #' @param omm.x.case The value of an omitted variable correlated with X that varies across cases/units
 #' @param omm.x.cross The value of an omitted variable correlated with X that varies cross-sectionally

@@ -7,7 +7,7 @@
 gen_errormat(data, time.ac, spatial.ac)
 }
 \description{
-This function generates a distribution of errors given a set of 
-over-time or between-cases coefficients. Errors can be affected by 
+This function generates a distribution of errors given a set of
+over-time or between-cases coefficients. Errors can be affected by
 either spatial or time autocorrelation.
 }

@@ -17,26 +17,26 @@ tw_plot(
 \arguments{
 \item{gensim}{A set of simulations produced by \code{\link{tw_sim}}}
 
-\item{display_est}{Whether to display estimated coefficients of 
+\item{display_est}{Whether to display estimated coefficients of
 independent variables from the linear model (\code{"coef"}) or the
 standard error of these estimates (\code{"se"})}
 
 \item{use_ci}{Whether to add confidence intervals around LOESS curves.
 Turn off if the CIs are too big relative to plot.}
 
-\item{xvar}{In case of multiple attributes varied in the simulation, which 
+\item{xvar}{In case of multiple attributes varied in the simulation, which
 attribute should be on the x axis? See \code{\link{tw_data}} for possible
-attribute names. Should be an unquoted variable name like 
+attribute names. Should be an unquoted variable name like
 \code{case.int.sd}.}
 
-\item{yvar}{In case of multiple attributes varied in the simulation, which 
+\item{yvar}{In case of multiple attributes varied in the simulation, which
 attribute should be on the y axis? See \code{\link{tw_data}} for possible
-attribute names. Should be an unquoted variable name like 
+attribute names. Should be an unquoted variable name like
 \code{case.int.sd}.}
 
-\item{facet_scales}{The value of \code{scales} option passed to the 
-\code{ggplot2} \code{facet_wrap} function to control the scales. 
-Changes to \code{'free_x'},\code{'free_y'} or \code{'free'} if the 
+\item{facet_scales}{The value of \code{scales} option passed to the
+\code{ggplot2} \code{facet_wrap} function to control the scales.
+Changes to \code{'free_x'},\code{'free_y'} or \code{'free'} if the
 scales obscure comparison}
 
 \item{...}{Currently ignored}
