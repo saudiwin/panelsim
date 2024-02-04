@@ -1,26 +1,107 @@
 library(tidyverse)
 library(panelsim)
 require(ggplot2)
+
 set.seed(22902)
 
-## Changing the mean of the within-time slopes
-sim1 <- tw_sim(iter=100, parallel=T, arg=c('omm.x.case',
-                                          'case.int.sd'),at1=-2:2,
-               at2=1:5,cores = 2)
+# see if DiD works
 
-sim1 <- tw_sim(N=250,T=50,iter=30, parallel=T, arg="case.eff.mean", range1=c(-2,5),cores=6,cross.eff.mean=0,cross.eff.sd=0)
+# loop 1,000 times
+# canonical DiD: two time points, interact with time point
 
-## plot simulation
+true_did_eff <- 2
+main_coef_x <- -2
 
-tw_plot(sim1,facet_scales = "free") + geom_point(alpha=0.5)
+# assume treatment effects are homogeneous
 
-sim_bin <- tw_sim(N=50,T=50,iter=30, parallel=T, arg="case.eff.mean", range1=c(0,0.5),cores=6,cross.eff.mean=0,cross.eff.sd=0,
-                  models=c("randomfx","wfe"),
-                  treat_effect=T,
-                  binary_outcome=T)
+calc_did <- parallel::mclapply(1:1000, function(i) {
 
-test_bin <- tw_data(N=100,T=100,case.eff.mean = -0.1,treat_effect = T,binary_outcome = T)
+  did_canonical <- tw_data(N=1000,T=2,did.eff.mean = true_did_eff,
+                           cross.eff.mean = main_coef_x,
+                           cross.int.mean = .5,case.int.mean = 2)
 
-## plot simulation
+  did_est <- lm(y ~ x*factor(time), data=did_canonical$data)
 
-tw_plot(sim1,facet_scales = "free_y") + geom_point(alpha=0.5)
+  tibble(ATE_DID=did_est$coefficients['x:factor(time)2'],
+         coef_x=did_est$coefficients['x'])
+
+},mc.cores=8) %>% bind_rows
+
+summary(calc_did$ATE_DID)
+
+summary(calc_did$coef_x)
+
+# matches simulated values
+
+# we can do this with a constant "treatment" effect with more T
+# recover coefficient if we still find the coef with a given time point
+
+true_did_eff <- -1.5
+main_coef_x <- 5
+
+calc_did <- parallel::mclapply(1:1000, function(i) {
+
+  did_canonical <- tw_data(N=1000,T=10,did.eff.mean = true_did_eff,
+                           cross.eff.mean = main_coef_x,
+                           cross.int.mean = .5,case.int.mean = 2)
+
+  did_est <- lm(y ~ x*factor(time), data=did_canonical$data)
+
+  did_est$coefficients['x:factor(time)2']
+
+},mc.cores=8) %>% unlist
+
+summary(calc_did)
+
+# but if we switch to TWFE, no dice:
+
+true_did_eff <- -1.5
+main_coef_x <- 5
+
+calc_did_twfe <- parallel::mclapply(1:1000, function(i) {
+
+  did_canonical <- tw_data(N=1000,T=10,did.eff.mean = true_did_eff,
+                           cross.eff.mean = main_coef_x,
+                           cross.int.mean = .5,case.int.mean = 2)
+
+  did_est <- lm(y ~ x + factor(time) + factor(case), data=did_canonical$data)
+
+  did_est$coefficients['x']
+
+},mc.cores=8) %>% unlist
+
+summary(calc_did_twfe)
+
+## ATE now equal to +2
+
+## Try with heterogenous DiD
+
+true_did_eff <- 2
+true_did_sd <- .5
+main_coef_x <- -2
+
+# assume treatment effects are homogeneous
+
+calc_did <- parallel::mclapply(1:1000, function(i) {
+
+  did_canonical <- tw_data(N=1000,T=10,did.eff.mean = true_did_eff,
+                           did.eff.sd = true_did_sd,
+                           cross.eff.mean = main_coef_x,
+                           cross.int.mean = .5,case.int.mean = 2)
+
+  did_est <- lm(y ~ x*factor(time), data=did_canonical$data)
+
+  tibble(ATE_DID=did_est$coefficients[grepl(x=names(did_est$coefficients),
+                                            pattern='x:factor')],
+         coef_x=did_est$coefficients['x'])
+
+},mc.cores=8) %>% bind_rows
+
+# still same average ATE but more variance
+
+summary(calc_did$ATE_DID)
+
+# main effect is he same
+
+summary(calc_did$coef_x)
+
