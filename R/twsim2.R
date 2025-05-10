@@ -185,47 +185,82 @@ gen_errormat <- function(data, time.ac, spatial.ac){
 #'
 #'
 #' @export
-tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
-                      cross.int.mean = 0, cross.int.sd = 1, cross.eff.mean = 0,
-                      did.eff.mean = 0, did.eff.sd = 0,
+tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
+                      cross.int.mean = -1, cross.int.sd = .5, cross.eff.mean = 0,
+                      did.eff.mean = 1, did.eff.sd = 0.25,
                       wid.eff.mean=0,wid.eff.sd=0,
                       cross.eff.sd = .5, case.eff.mean = 0.5, case.eff.sd = .5, noise.sd = 1,
                       omm.x.case = 0, omm.x.cross = 0, omm.y.case = 0, omm.y.cross = 0,
                       treat_effect = FALSE,
                     binary_outcome=FALSE,unbalance = FALSE,
                     gsynth=FALSE,
-                    prop_treated_gsynth=0.5,time.ac = 0, spatial.ac = 0){
+                    prop_treated_gsynth=0.5,time.ac = 0, spatial.ac = 0,
+                    prior_true_vals=NULL) {
 
       # if treatment effects are used, need to exclude negative numbers
-  if(case.eff.sd>0) {
+  if(case.eff.sd>0 && is.null(prior_true_vals)) {
+
     gamma <- rnorm(N, mean=case.eff.mean, sd=case.eff.sd)
-  } else {
-    gamma <- case.eff.mean
+
+  } else if(!is.null(prior_true_vals)) {
+
+    gamma <- prior_true_vals$gamma
+
+  }  else {
+    gamma <- rep(case.eff.mean,N)
   }
 
-  if(cross.eff.sd>0) {
+  if(cross.eff.sd>0 && is.null(prior_true_vals)) {
+
     beta <- rnorm(T, mean=cross.eff.mean, sd=cross.eff.sd)
-  } else {
-    beta <- cross.eff.mean
+
+  } else if(!is.null(prior_true_vals)) {
+
+    beta <- prior_true_vals$beta
+
+    } else {
+    beta <- rep(cross.eff.mean,T)
   }
 
-  if(did.eff.sd>0) {
+  if(did.eff.sd>0 && is.null(prior_true_vals)) {
 
     did <- rnorm(T, mean=did.eff.mean, sd=did.eff.sd)
 
+  } else if(!is.null(prior_true_vals)) {
+
+    did <- prior_true_vals$did
+
   } else {
 
-    did <- did.eff.mean
+    did <- rep(did.eff.mean,T)
 
   }
 
-  if(wid.eff.sd>0) {
+  if(wid.eff.sd>0 && is.null(prior_true_vals)) {
 
     wid <- rnorm(T, mean=wid.eff.mean, sd=wid.eff.sd)
 
+  } else if(!is.null(prior_true_vals)) {
+
+    wid <- prior_true_vals$wid
+
   } else {
 
-    wid <- wid.eff.mean
+    wid <- rep(wid.eff.mean,T)
+
+  }
+
+  # need global intercepts
+
+  if(is.null(prior_true_vals)) {
+
+    i.intercept <- rnorm(1)
+    t.intercept <- rnorm(1)
+
+  } else {
+
+    i.intercept=prior_true_vals$i.intercept
+    t.intercept=prior_true_vals$t.intercept
 
   }
 
@@ -261,7 +296,9 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
         control_period <- round(T*prop_treated_gsynth)
 
         bet.data <- data.frame(case=1:N,
-                               alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd),
+                               alpha.i=ifelse(is.null(prior_true_vals),
+                                              rnorm(N, mean=case.int.mean, sd=case.int.sd),
+                                              prior_true_vals$alpha.i),
                                gamma=gamma,
                                zi=rnorm(N),
                                unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
@@ -281,34 +318,69 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
         with.data <- bind_rows(with.data_cont,with.data_between)
 
       } else {
+
+        if(case.int.sd>0 & is.null(prior_true_vals)) {
+
+          alpha.i <- rnorm(N, mean=case.int.mean, sd=case.int.sd)
+
+        } else if(!is.null(prior_true_vals)) {
+
+          alpha.i <- prior_true_vals$alpha.i
+
+        } else {
+
+          alpha.i <- rep(case.int.mean, N)
+
+        }
+
+
+
+
         bet.data <- data.frame(case=1:N,
-                               alpha.i=rnorm(N, mean=case.int.mean, sd=case.int.sd),
+                               alpha.i=alpha.i,
                                gamma=gamma,
                                zi=rnorm(N),
                                wid=wid,
                                unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
                                one=1) %>%
-                    mutate(wid=ifelse(case==1,0,wid))
+                    mutate(alpha.i=ifelse(case==1,0,alpha.i),
+                           wid=ifelse(case==1,0,wid))
+
+        if(cross.int.sd>0 & is.null(prior_true_vals)) {
+
+          alpha.t <-  rnorm(T, mean=cross.int.mean, sd=cross.int.sd)
+
+        } else if(!is.null(prior_true_vals)) {
+
+          alpha.t <- prior_true_vals$alpha.t
+
+        } else {
+
+          alpha.t <- rep(cross.int.mean, N)
+
+        }
+
         with.data <- data.frame(time=1:T,
-                                alpha.t=rnorm(T, mean=cross.int.mean, sd=cross.int.sd),
+                                alpha.t=alpha.t,
                                 beta=beta,
                                 did=did,
                                 zt=rnorm(T),
                                 one=1) %>%
-          mutate(did=ifelse(time==1,0,did))
+          mutate(alpha.t=ifelse(time==1,0,alpha.t),
+                 did=ifelse(time==1,0,did))
       }
-
-
 
       data <- full_join(bet.data, with.data, by="one")
 
 
       if(time.ac==0 && spatial.ac==0) {
+
         # if no autocorrelation, much faster to just use rnorm
         data <- data %>%
               mutate(noise=rnorm(n=N*T,sd=noise.sd),
-                     x=(alpha.i-alpha.t)/(did + beta - gamma - wid) + omm.x.case*zi + omm.x.cross*zt,
-                     y=((ifelse(is.infinite(beta),0,beta) + did)*alpha.i- (gamma + wid)*alpha.t)/(did + beta - gamma - wid) + omm.y.case*zi + omm.y.cross*zt + noise,
+                     denom=(beta + did - gamma - wid),
+                     x=((alpha.i - alpha.t)/denom) + omm.x.case*zi + omm.x.cross*zt,
+                     y= ((beta * alpha.i  + beta * i.intercept + did*i.intercept + did*alpha.i - gamma *i.intercept - wid * i.intercept - alpha.t * gamma - wid * alpha.t)/denom) + omm.y.case*zi + omm.y.cross*zt + noise,
                      tokeep = time <= unbal) %>%
               dplyr::select(case, time, y, x, gamma, beta, alpha.i, alpha.t, noise,
                             zi, zt, wid, did, tokeep) %>%
@@ -333,8 +405,18 @@ tw_data <- function(N = 30, T = 30, case.int.mean = 0, case.int.sd = 1,
                       treat_effect = treat_effect,
                       binary_outcome=binary_outcome,
                       unbalance = unbalance, time.ac = time.ac, spatial.ac = spatial.ac)
-      toreturn <- list(data, pars)
-      names(toreturn) <- c("data", "pars")
+
+      fixed_params <- list(gamma=gamma,
+                           wid=wid,
+                           beta=beta,
+                           did=did,
+                           alpha.i=bet.data$alpha.i,
+                           alpha.t=with.data$alpha.t,
+                           i.intercept=i.intercept,
+                           t.intercept=t.intercept)
+
+      toreturn <- list(data, pars, fixed_params)
+      names(toreturn) <- c("data", "pars", "fixed_params")
       return(toreturn)
 }
 

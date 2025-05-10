@@ -9,4 +9,4 @@ Description: Simulation and power analysis of panel/multilevel data that allows 
 Imports: dplyr,plm,MASS,sandwich,RSQLite,gsynth,wfe
 License: GPL
 LazyData: FALSE
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.2

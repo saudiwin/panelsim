@@ -55,20 +55,43 @@
 
 #' @import dplyr
 #' @export
-twsimdata <- function(N=30, T=30, ui.mean=0, ui.sd=1, vt.mean=0, vt.sd=1,
+twsimdata <- function(N=30, T=30, ui.mean=0.5, ui.sd=0, vt.mean=-1, vt.sd=0,
                       ep.ui.sd=.1, ep.vt.sd=.1, betaBmean=3, betaBsd=0, betaWmean=-3, betaWsd=0,
                       binary=FALSE, unbalance=FALSE, gamma.ux=0, gamma.vx=0, gamma.uy=0, gamma.vy=0){
 
 
+      if(ui.sd>0) {
 
-      bet.data <- data.frame(case=1:N, ui=rnorm(N, mean=ui.mean, sd=ui.sd),
-                             betaW=rnorm(N, mean=betaWmean, sd=betaWsd), zi=rnorm(N))
-      with.data <- data.frame(time=1:T, vt=rnorm(T, mean=vt.mean, sd=vt.sd),
-                              betaB=rnorm(T, mean=betaBmean, sd=betaBsd), zt=rnorm(T))
+        bet.data <- data.frame(case=1:N, ui=rnorm(N, mean=ui.mean, sd=ui.sd),
+                               betaW=rnorm(N, mean=betaWmean, sd=betaWsd), zi=rnorm(N))
+
+      } else {
+
+        bet.data <- data.frame(case=1:N, ui=rep(ui.mean, N),
+                               betaW=rep(betaWmean, N), zi=rnorm(N))
+
+      }
+
+      if(vt.sd>0) {
+
+        with.data <- data.frame(time=1:T, vt=rnorm(T, mean=vt.mean, sd=vt.sd),
+                                betaB=rnorm(T, mean=betaBmean, sd=betaBsd), zt=rnorm(T))
+
+      } else {
+
+        with.data <- data.frame(time=1:T, vt=rep(vt.mean, N),
+                                betaB=rep(betaBmean, N), zt=rnorm(T))
+
+      }
+
+
       if(unbalance){
+
             bet.data$unbal <- ceiling(runif(N, min=(T/3), max=T))
             data <- merge(bet.data, with.data)
+
       } else data <- merge(bet.data, with.data)
+
       data$ep.ui <- rnorm(nrow(data), mean=0, sd=ep.ui.sd)
       data$ep.vt <- rnorm(nrow(data), mean=0, sd=ep.vt.sd)
 
@@ -446,7 +469,7 @@ run_vdem <- function(varnames=NULL,full_formula=NULL,modelfunc=lm,select_vars=NU
   select_vars <- c(select_vars,'country_text_id','year')
   vdem_data <- RSQLite::dbGetQuery(dbcon,paste0('SELECT ',paste0(select_vars,collapse=','),' FROM vdem_data')) %>%
     as_tibble %>% mutate(year_factor=factor(year))
-  
+
   if(time_interaction==TRUE) {
     vdem_data$europe <- if_else(vdem_data$e_regionpol==5,1,0)
     select_vars <- c(select_vars,'europe')
