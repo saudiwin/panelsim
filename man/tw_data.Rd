@@ -8,12 +8,12 @@ tw_data(
   N = 30,
   T = 30,
   case.int.mean = 0.5,
-  case.int.sd = 0,
+  case.int.sd = 0.5,
   cross.int.mean = -1,
-  cross.int.sd = 0,
+  cross.int.sd = 0.5,
   cross.eff.mean = 0,
-  did.eff.mean = 0,
-  did.eff.sd = 0,
+  did.eff.mean = 1,
+  did.eff.sd = 0.25,
   wid.eff.mean = 0,
   wid.eff.sd = 0,
   cross.eff.sd = 0.5,
@@ -24,13 +24,15 @@ tw_data(
   omm.x.cross = 0,
   omm.y.case = 0,
   omm.y.cross = 0,
-  treat_effect = FALSE,
+  treat_effect = NULL,
+  this_case = NULL,
+  this_time = NULL,
   binary_outcome = FALSE,
+  binary_x = FALSE,
   unbalance = FALSE,
-  gsynth = FALSE,
-  prop_treated_gsynth = 0.5,
   time.ac = 0,
-  spatial.ac = 0
+  spatial.ac = 0,
+  prior_true_vals = NULL
 )
 }
 \arguments{
@@ -72,9 +74,11 @@ tw_data(
 
 \item{omm.y.cross}{The value of an omitted variable correlated with Y that varies cross-sectionally}
 
-\item{treat_effect}{Whether to generate an X variable that is 0/1 (dichotomous treatment). If so,
-all effects (case/time/omitted) should be strictly between \code{[0,.9999]} as they will
-be interpreted as probabilities.}
+\item{treat_effect}{A vector of length 1 or N*T that is equal to 1 for assignment to treatment and 0 for assignment to control. If this argument is not NULL, `tw_data` will generate data for y that takes x as fixed to these values (i.e., treatment is being assigned/manipulated).}
+
+\item{binary_outcome}{Whether the Y (outcome) variable should be converted to 0/1. Note that this can lead to some measurement bias as Y is simulated as continuous.}
+
+\item{binary_x}{Whether X should be converted to 0/1. Note that doing so may lead to some bias in estimation as X is simulated as continuous.}
 
 \item{unbalance}{Whether to simulate varying numbers of observations by cases or time points.}
 
@@ -83,24 +87,24 @@ be interpreted as probabilities.}
 \item{spatial.ac}{A value between 0 and 1 giving the cross-sectional (spatial)
 autocorrelation in the effect of X on Y}
 
-\item{bin_outcome}{Whether the Y (outcome) variable should also be simulated as a binary 0/1 variable.}
+\item{prior_true_vals}{A fitted `tw_data` object with generated coefficients that can be used to keep vectors of intercepts/effects fixed over repeated sampling}
 }
 \value{
 The function returns a named list where \code{object$data} is a \code{data.frame} and
-\code{object$pars} are the original parametes used to generate the data.
+\code{object$pars} are the original parametes used to generate the data. The value of generated coefficients is returned in a list as \code{object$fixed_params}. For repeated sampling, the object can be given to the `prior_true_vals` argument to allow for fixed population parameters for intercepts and vectors of effects.
 }
 \description{
 This function will produce panel data where variation can exist in the cross-section, over time
 or in both dimensions simultaneously. Furthermore, effect heterogeneity by case or cross section
-is also allowed.
+is also allowed, along with interactive effects such as differences-in-differences.
 }
 \details{
 The \code{tw_data} function is the workhorse of the \code{twowaysim} package. It accepts as
 input the dimensions of the panel/TSCS data to be generated, and also parameters that
 determine the extent of variance and heterogeneity in either the cross-sectional or
-over-time effects in the data. The parameter \code{N} determines how many observations
+over-time effects in the data or the interaction thereof. The parameter \code{N} determines how many observations
 exist for each case or unit in the panel, while \code{T} determines how many time points exist
-per case or unit. To create a model with a within-unit over-time (case) effect,
+per case or unit. To create a model with a homogenous (static) within-unit over-time (case) effect,
 simply set \code{case.eff.mean} to a non-zero number and set \code{case.eff.sd} to zero. Similarly,
 setting \code{cross.eff.mean} to a non-zero number and \code{cross.eff.sd} to zero will produce a
 panel dataset with a cross-sectional effect of X on Y where the effect of X does not vary across
@@ -111,9 +115,11 @@ cases will return the \code{case.eff.mean} coefficient and a model with intercep
 the \code{cross.eff.mean} estimate, whereas a 2-way model (intercepts on cases and time points) will return
 a difficult-to-characterize weighted average.
 
-We refer you to Kropko and Kubinec (2018) for more information
+To estimate a difference-in-differences (time interaction) effect, set \code{did.eff.mean} to a non-zero number and set \code{did.eff.sd} to zero if the DiD effects are supposed to be homogenous. Note that to estimate a standard "canonical" DiD setup, the time points \code{T} should be no more than 2. For more information about generating DiD specifications with `tw_data`, see the blog post \url{https://www.robertkubinec.com/post/did_dnd/index.html}.
+
+We refer you to Kropko and Kubinec (2020) for more information
 on the difference between these models:
-\url{https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3062619}.
+\url{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0231349}.
 
 The parameters \code{case.int} and \code{cross.int} represent the values of the intercepts for the
 cases or time points. Changing these parameters will increase or decrease the amount of unexplained

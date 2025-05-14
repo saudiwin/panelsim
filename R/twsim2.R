@@ -86,14 +86,14 @@ gen_errormat <- function(data, time.ac, spatial.ac){
 #'
 #' This function will produce panel data where variation can exist in the cross-section, over time
 #' or in both dimensions simultaneously. Furthermore, effect heterogeneity by case or cross section
-#' is also allowed.
+#' is also allowed, along with interactive effects such as differences-in-differences.
 #'
 #' The \code{tw_data} function is the workhorse of the \code{twowaysim} package. It accepts as
 #' input the dimensions of the panel/TSCS data to be generated, and also parameters that
 #' determine the extent of variance and heterogeneity in either the cross-sectional or
-#' over-time effects in the data. The parameter \code{N} determines how many observations
+#' over-time effects in the data or the interaction thereof. The parameter \code{N} determines how many observations
 #' exist for each case or unit in the panel, while \code{T} determines how many time points exist
-#' per case or unit. To create a model with a within-unit over-time (case) effect,
+#' per case or unit. To create a model with a homogenous (static) within-unit over-time (case) effect,
 #' simply set \code{case.eff.mean} to a non-zero number and set \code{case.eff.sd} to zero. Similarly,
 #' setting \code{cross.eff.mean} to a non-zero number and \code{cross.eff.sd} to zero will produce a
 #' panel dataset with a cross-sectional effect of X on Y where the effect of X does not vary across
@@ -104,9 +104,11 @@ gen_errormat <- function(data, time.ac, spatial.ac){
 #' the \code{cross.eff.mean} estimate, whereas a 2-way model (intercepts on cases and time points) will return
 #' a difficult-to-characterize weighted average.
 #'
-#' We refer you to Kropko and Kubinec (2018) for more information
+#' To estimate a difference-in-differences (time interaction) effect, set \code{did.eff.mean} to a non-zero number and set \code{did.eff.sd} to zero if the DiD effects are supposed to be homogenous. Note that to estimate a standard "canonical" DiD setup, the time points \code{T} should be no more than 2. For more information about generating DiD specifications with `tw_data`, see the blog post \url{https://www.robertkubinec.com/post/did_dnd/index.html}.
+#'
+#' We refer you to Kropko and Kubinec (2020) for more information
 #' on the difference between these models:
-#' \url{https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3062619}.
+#' \url{https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0231349}.
 #'
 #' The parameters \code{case.int} and \code{cross.int} represent the values of the intercepts for the
 #' cases or time points. Changing these parameters will increase or decrease the amount of unexplained
@@ -127,7 +129,7 @@ gen_errormat <- function(data, time.ac, spatial.ac){
 #' subscript of \code{omm}.
 #'
 #' @return The function returns a named list where \code{object$data} is a \code{data.frame} and
-#' \code{object$pars} are the original parametes used to generate the data.
+#' \code{object$pars} are the original parametes used to generate the data. The value of generated coefficients is returned in a list as \code{object$fixed_params}. For repeated sampling, the object can be given to the `prior_true_vals` argument to allow for fixed population parameters for intercepts and vectors of effects.
 #'
 #' @examples
 #'
@@ -174,14 +176,14 @@ gen_errormat <- function(data, time.ac, spatial.ac){
 #' @param omm.x.cross The value of an omitted variable correlated with X that varies cross-sectionally
 #' @param omm.y.case The value of an omitted variable correlated with Y that varies across cases/units
 #' @param omm.y.cross The value of an omitted variable correlated with Y that varies cross-sectionally
-#' @param treat_effect Whether to generate an X variable that is 0/1 (dichotomous treatment). If so,
-#' all effects (case/time/omitted) should be strictly between \code{[0,.9999]} as they will
-#' be interpreted as probabilities.
-#' @param bin_outcome Whether the Y (outcome) variable should also be simulated as a binary 0/1 variable.
+#' @param treat_effect A vector of length 1 or N*T that is equal to 1 for assignment to treatment and 0 for assignment to control. If this argument is not NULL, `tw_data` will generate data for y that takes x as fixed to these values (i.e., treatment is being assigned/manipulated).
+#' @param binary_outcome Whether the Y (outcome) variable should be converted to 0/1. Note that this can lead to some measurement bias as Y is simulated as continuous.
+#' @param binary_x Whether X should be converted to 0/1. Note that doing so may lead to some bias in estimation as X is simulated as continuous.
 #' @param unbalance Whether to simulate varying numbers of observations by cases or time points.
 #' @param time.ac A value between 0 and 1 giving the over-time autocorrelation in effect of X on Y
 #' @param spatial.ac A value between 0 and 1 giving the cross-sectional (spatial)
 #' autocorrelation in the effect of X on Y
+#' @param prior_true_vals A fitted `tw_data` object with generated coefficients that can be used to keep vectors of intercepts/effects fixed over repeated sampling
 #'
 #'
 #' @export
@@ -191,10 +193,9 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
                       wid.eff.mean=0,wid.eff.sd=0,
                       cross.eff.sd = .5, case.eff.mean = 0.5, case.eff.sd = .5, noise.sd = 1,
                       omm.x.case = 0, omm.x.cross = 0, omm.y.case = 0, omm.y.cross = 0,
-                      treat_effect = FALSE,
-                    binary_outcome=FALSE,unbalance = FALSE,
-                    gsynth=FALSE,
-                    prop_treated_gsynth=0.5,time.ac = 0, spatial.ac = 0,
+                      treat_effect = NULL,this_case=NULL,this_time=NULL,
+                    binary_outcome=FALSE,binary_x=FALSE,unbalance = FALSE,
+                    time.ac = 0, spatial.ac = 0,
                     prior_true_vals=NULL) {
 
       # if treatment effects are used, need to exclude negative numbers
@@ -204,7 +205,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
   } else if(!is.null(prior_true_vals)) {
 
-    gamma <- prior_true_vals$gamma
+    gamma <- prior_true_vals$fixed_params$gamma
 
   }  else {
     gamma <- rep(case.eff.mean,N)
@@ -216,7 +217,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
   } else if(!is.null(prior_true_vals)) {
 
-    beta <- prior_true_vals$beta
+    beta <- prior_true_vals$fixed_params$beta
 
     } else {
     beta <- rep(cross.eff.mean,T)
@@ -228,7 +229,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
   } else if(!is.null(prior_true_vals)) {
 
-    did <- prior_true_vals$did
+    did <- prior_true_vals$fixed_params$did
 
   } else {
 
@@ -238,15 +239,15 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
   if(wid.eff.sd>0 && is.null(prior_true_vals)) {
 
-    wid <- rnorm(T, mean=wid.eff.mean, sd=wid.eff.sd)
+    wid <- rnorm(N, mean=wid.eff.mean, sd=wid.eff.sd)
 
   } else if(!is.null(prior_true_vals)) {
 
-    wid <- prior_true_vals$wid
+    wid <- prior_true_vals$fixed_params$wid
 
   } else {
 
-    wid <- rep(wid.eff.mean,T)
+    wid <- rep(wid.eff.mean,N)
 
   }
 
@@ -259,13 +260,13 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
   } else {
 
-    i.intercept=prior_true_vals$i.intercept
-    t.intercept=prior_true_vals$t.intercept
+    i.intercept=prior_true_vals$fixed_params$i.intercept
+    t.intercept=prior_true_vals$fixed_params$t.intercept
 
   }
 
 
-      if(treat_effect || binary_outcome) {
+      if(binary_outcome) {
         if(case.eff.mean>.9999 || cross.eff.mean>.9999 || omm.x.cross>.9999 ||
            omm.y.cross>.9999 || omm.x.case>.9999 || omm.y.case>.9999) {
           stop("You specified a value for a treatment/omitted variable that is greater than .9999 (i.e. not a probability).\n
@@ -288,36 +289,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
       }
 
-      # we need different data if we are going to simulate gsynth
-
-      if(gsynth) {
-
-        print("Note: changing data distribution to reflect assumptions of gsynth estimator (only one transition from control to treatment.)")
-        control_period <- round(T*prop_treated_gsynth)
-
-        bet.data <- data.frame(case=1:N,
-                               alpha.i=ifelse(is.null(prior_true_vals),
-                                              rnorm(N, mean=case.int.mean, sd=case.int.sd),
-                                              prior_true_vals$alpha.i),
-                               gamma=gamma,
-                               zi=rnorm(N),
-                               unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
-                               one=1)
-        # make sure control group has X=0
-        with.data_cont <- data.frame(time=1:control_period,
-                                alpha.t=rnorm(control_period, mean=cross.int.mean, sd=cross.int.sd),
-                                beta=-Inf,
-                                zt=rnorm(control_period),
-                                one=1)
-        with.data_between <- data.frame(time=(control_period+1):T,
-                                     alpha.t=rnorm(length((control_period+1):T), mean=cross.int.mean, sd=cross.int.sd),
-                                     beta=beta,
-                                     zt=rnorm(length((control_period+1):T)),
-                                     one=1)
-
-        with.data <- bind_rows(with.data_cont,with.data_between)
-
-      } else {
+      # we need different data if we are going to simulate gsynt
 
         if(case.int.sd>0 & is.null(prior_true_vals)) {
 
@@ -325,7 +297,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
         } else if(!is.null(prior_true_vals)) {
 
-          alpha.i <- prior_true_vals$alpha.i
+          alpha.i <- prior_true_vals$fixed_params$alpha.i
 
         } else {
 
@@ -333,18 +305,15 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
         }
 
-
-
-
-        bet.data <- data.frame(case=1:N,
-                               alpha.i=alpha.i,
-                               gamma=gamma,
-                               zi=rnorm(N),
-                               wid=wid,
-                               unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
-                               one=1) %>%
-                    mutate(alpha.i=ifelse(case==1,0,alpha.i),
-                           wid=ifelse(case==1,0,wid))
+          bet.data <- data.frame(case=1:N,
+                                 alpha.i=alpha.i,
+                                 gamma=gamma,
+                                 zi=rnorm(N),
+                                 wid=wid,
+                                 unbal=ifelse(unbalance, ceiling(runif(N, min=(T/3), max=T)), T),
+                                 one=1) %>%
+            mutate(alpha.i=ifelse(case==1,0,alpha.i),
+                   wid=ifelse(case==1,0,wid))
 
         if(cross.int.sd>0 & is.null(prior_true_vals)) {
 
@@ -352,7 +321,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
         } else if(!is.null(prior_true_vals)) {
 
-          alpha.t <- prior_true_vals$alpha.t
+          alpha.t <- prior_true_vals$fixed_params$alpha.t
 
         } else {
 
@@ -360,15 +329,17 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
 
         }
 
-        with.data <- data.frame(time=1:T,
-                                alpha.t=alpha.t,
-                                beta=beta,
-                                did=did,
-                                zt=rnorm(T),
-                                one=1) %>%
-          mutate(alpha.t=ifelse(time==1,0,alpha.t),
-                 did=ifelse(time==1,0,did))
-      }
+          with.data <- data.frame(time=1:T,
+                                  alpha.t=alpha.t,
+                                  beta=beta,
+                                  did=did,
+                                  zt=rnorm(T),
+                                  one=1) %>%
+            mutate(alpha.t=ifelse(time==1,0,alpha.t),
+                   did=ifelse(time==1,0,did))
+
+
+
 
       data <- full_join(bet.data, with.data, by="one")
 
@@ -376,15 +347,45 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
       if(time.ac==0 && spatial.ac==0) {
 
         # if no autocorrelation, much faster to just use rnorm
-        data <- data %>%
-              mutate(noise=rnorm(n=N*T,sd=noise.sd),
-                     denom=(beta + did - gamma - wid),
-                     x=((alpha.i - alpha.t)/denom) + omm.x.case*zi + omm.x.cross*zt,
-                     y= ((beta * alpha.i  + beta * i.intercept + did*i.intercept + did*alpha.i - gamma *i.intercept - wid * i.intercept - alpha.t * gamma - wid * alpha.t)/denom) + omm.y.case*zi + omm.y.cross*zt + noise,
-                     tokeep = time <= unbal) %>%
-              dplyr::select(case, time, y, x, gamma, beta, alpha.i, alpha.t, noise,
-                            zi, zt, wid, did, tokeep) %>%
-              arrange(case, time)
+
+        if(is.null(treat_effect)) {
+
+          # generate both X and Y
+
+          data <- data %>%
+            mutate(noise=rnorm(n=N*T,sd=noise.sd),
+                   denom=(beta + did - gamma - wid),
+                   x=((alpha.i + i.intercept - alpha.t - t.intercept)/denom) + omm.x.case*zi + omm.x.cross*zt,
+                   y= ((beta * alpha.i + did*alpha.i + beta * i.intercept + did * i.intercept - alpha.t * gamma - wid * alpha.t - gamma * t.intercept - wid * t.intercept)/denom) + omm.y.case*zi + omm.y.cross*zt + noise,
+                   tokeep = time <= unbal) %>%
+            dplyr::select(case, time, y, x, gamma, beta, alpha.i, alpha.t, noise,
+                          zi, zt, wid, did, tokeep) %>%
+            arrange(case, time)
+
+        } else {
+
+          # X is assigned, generate Y
+
+          # make the treat effect longer if it needs to be
+
+          if(length(treat_effect)==1) treat_effect <- rep(treat_effect, N*`T`)
+
+          data <- data %>%
+            mutate(noise=rnorm(n=N*T,sd=noise.sd),
+                   x=treat_effect,
+                   y= ifelse(treat_effect,
+                             t.intercept + alpha.t + beta + did + omm.y.case*zi + omm.y.cross*zt + noise,
+                             t.intercept + alpha.t + noise),
+                   tokeep = time <= unbal) %>%
+            dplyr::select(case, time, y, x, gamma, beta, alpha.i, alpha.t, noise,
+                          zi, zt, wid, did, tokeep) %>%
+            arrange(case, time)
+
+        }
+
+        if(binary_outcome) data$y <- as.numeric(data$y > median(data$y))
+        if(binary_x) data$x <- as.numeric(data$x > median(data$x))
+
       } else {
         eps <- gen_errormat(data, time.ac, spatial.ac)
         data <- data %>%
@@ -402,7 +403,7 @@ tw_data <- function(N = 30, T = 30, case.int.mean = .5, case.int.sd = .5,
                       cross.int.mean = cross.int.mean, cross.int.sd = cross.int.sd, cross.eff.mean = cross.eff.mean,
                       cross.eff.sd = cross.eff.sd, case.eff.mean = case.eff.mean, case.eff.sd = case.eff.sd, noise.sd = noise.sd,
                       omm.x.case = omm.x.case, omm.x.cross = omm.x.cross, omm.y.case = omm.y.case, omm.y.cross = omm.y.cross,
-                      treat_effect = treat_effect,
+                      binary_x=binary_x,
                       binary_outcome=binary_outcome,
                       unbalance = unbalance, time.ac = time.ac, spatial.ac = spatial.ac)
 
